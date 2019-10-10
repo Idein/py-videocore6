@@ -2,6 +2,9 @@
 
 Python library for GPGPU programming on Raspberry Pi 4.
 
+For Raspberry Pi 1/2/3, use
+[nineties/py-videocore](https://github.com/nineties/py-videocore) instead.
+
 ## Installation
 
 ```
