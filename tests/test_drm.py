@@ -1,6 +1,7 @@
 
 from videocore6.drm_v3d import DRM_V3D
 
+
 def test_get_param():
     print()
 
@@ -25,6 +26,9 @@ def test_get_param():
         print(f'core0_ident2: {core0_ident2:#010x}')
         print(f'supports_tfu: {supports_tfu:#010x}')
         print(f'supports_csd: {supports_csd:#010x}')
+
+    print('Consult /sys/kernel/debug/dri/0/v3d_regs for more information')
+
 
 def test_alloc():
     print()
