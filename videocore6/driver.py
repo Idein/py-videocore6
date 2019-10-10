@@ -1,6 +1,6 @@
 
 import mmap
-import buffer_to_ptr
+from videocore6 import buffer_to_ptr
 from videocore6.drm_v3d import DRM_V3D
 from videocore6.assembler import Assembly
 import numpy as np

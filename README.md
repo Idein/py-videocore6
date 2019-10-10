@@ -15,6 +15,7 @@ $ python3 setup.py install --user
 ## Testing
 
 ```
+$ python3 setup.py build_ext --inplace
 $ pip3 install nose
 $ nosetests -v -s
 ```
