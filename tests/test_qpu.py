@@ -43,4 +43,4 @@ def test_clock():
         end = time.time()
 
         print(f'{end - start} sec')
-        print(f'{f / (end - start) / 1024 / 1024 * 4} MHz')
+        print(f'{f * 5 / (end - start) / 1000 / 1000 * 4} MHz')
