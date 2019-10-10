@@ -3,16 +3,7 @@
 import struct
 import functools
 import numpy as np
-
-
-def float_to_int(f):
-    return struct.unpack('i', struct.pack('f', f))[0]
-
-def int_to_float(i):
-    return struct.unpack('f', struct.pack('i', i))[0]
-
-def int_to_uint(i):
-    return struct.unpack('I', struct.pack('i', i))[0]
+from videocore6 import float_to_int, int_to_float, int_to_uint
 
 
 class AssembleError(Exception):
