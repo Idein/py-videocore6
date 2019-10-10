@@ -5,7 +5,7 @@ from videocore6.assembler import qpu
 
 
 @qpu
-def func(asm):
+def qpu_clock(asm):
 
     nop(null, sig = 'ldunif')
 
@@ -33,7 +33,7 @@ def test_clock():
 
         f = pow(2, 25)
 
-        code = drv.program(func)
+        code = drv.program(qpu_clock)
         unif = drv.alloc(1, dtype = 'uint32')
 
         unif[0] = f
