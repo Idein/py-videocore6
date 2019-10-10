@@ -41,7 +41,6 @@ class Memory(object):
         self.size = size
         self.handle  = None  # Handle of BO for V3D DRM
         self.phyaddr = None  # Physical address used in QPU
-        self.usraddr = None  # User address used in CPU
         self.buffer  = None  # mmap object of the memory area
 
         try:
@@ -52,7 +51,6 @@ class Memory(object):
                     flags = mmap.MAP_SHARED,
                     prot = mmap.PROT_READ | mmap.PROT_WRITE,
                     offset = offset)
-            self.usraddr = buffer_to_ptr.get_ptr(self.buffer)
 
         except Exception as e:
 
@@ -71,7 +69,6 @@ class Memory(object):
         self.size = None
         self.handle = None
         self.phyaddr = None
-        self.usraddr = None
         self.buffer = None
 
 
