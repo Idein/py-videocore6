@@ -5,11 +5,11 @@ Python library for GPGPU programming on Raspberry Pi 4.
 ## Installation
 
 ```
-$ git clone https://github.com/Idein/py-videocore6
+$ git clone https://github.com/Idein/py-videocore6.git
 $ cd py-videocore6/
-$ pip3 install -r requirements.txt
+$ pip3 install --user --requirement requirements.txt
 $ python3 setup.py build
-$ sudo python3 setup.py install
+$ python3 setup.py install --user
 ```
 
 ## Testing
