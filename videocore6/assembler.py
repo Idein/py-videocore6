@@ -12,8 +12,12 @@ class AssembleError(Exception):
 
 class Assembly(list):
 
-    # name : index
-    labels = {}
+    def __init__(self, *args, **kwargs):
+
+        super().__init__(*args, **kwargs)
+
+        # name : index
+        self.labels = {}
 
     def finalize(self):
         for idx, insn in enumerate(self):
