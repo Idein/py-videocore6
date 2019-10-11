@@ -3,7 +3,7 @@ from cpython.buffer cimport Py_buffer, PyBUF_SIMPLE, \
         PyObject_GetBuffer, PyBuffer_Release
 
 
-def get_ptr(object mem):
+def buffer_to_ptr(object mem):
 
     cdef Py_buffer buf
 
