@@ -81,12 +81,10 @@ def qpu_tmu_write(asm):
         #   the same time, the data (not address) of the element with the
         #   largest element index in the quad is used.
         for i in range(4):
-            bor(tmud, rf0, rf0).sub(null, r0, i, cond = 'pushz')
+            sub(null, r0, i, cond = 'pushz').mov(tmud, rf0)
             add(tmua, r5, i * 4, cond = 'ifa')
 
-        tmuwt(null)
-
-        sub(r1, r1, 1, cond = 'pushz')
+        tmuwt(null).sub(r1, r1, 1, cond = 'pushz')
         b(R.loop, cond = 'anyna')
         # rf0 += 16
         sub(rf0, rf0, -16)
@@ -112,8 +110,8 @@ def test_tmu_write():
     with Driver(data_area_size = n * 16 * 4 + 2 * 4) as drv:
 
         code = drv.program(qpu_tmu_write)
-        unif = drv.alloc(2, dtype = 'uint32')
         data = drv.alloc(n * 16, dtype = 'uint32')
+        unif = drv.alloc(2, dtype = 'uint32')
 
         data[:] = 0xdeadbeaf
         unif[0] = n
