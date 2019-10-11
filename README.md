@@ -14,6 +14,23 @@ You can try it with
 For Raspberry Pi 1/2/3, use
 [nineties/py-videocore](https://github.com/nineties/py-videocore) instead.
 
+## About VideoCore VI QPU
+
+Raspberry Pi 4 has a GPU named VideoCore VI QPU in its SoC.
+Though the basic instruction set (add/mul ALU dual issue, three delay slots
+et al.) remains same as VideoCore IV QPU of Raspberry Pi 1/2/3,
+the usages of some units are dramatically changed.
+For instance, the TMU can now write to memory in addition to read.
+Consult the [tests](./tests) directory for more examples.
+
+Theoretical peak performances of QPUs are as follows.
+Note that the V3D DRM driver does not seem to support multi-sliced CSD job for
+now.
+
+- VideoCore IV QPU @ 250MHz: 250 [MHz] x 3 [slice] x 4 [qpu/slice] x 4 [physical core] x 2 [op/cycle] = 24 [Gflop/s]
+- VideoCore IV QPU @ 300MHz: 300 [MHz] x 3 [slice] x 4 [qpu/slice] x 4 [physical core] x 2 [op/cycle] = 28.8 [Gflop/s]
+- VideoCore VI QPU @ 500MHz: 500 [MHz] x 2 [slice] x 4 [qpu/slice] x 4 [physical core] x 2 [op/cycle] = 32 [Gflop/s]
+
 ## Installation
 
 ```
