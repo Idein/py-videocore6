@@ -50,8 +50,40 @@ class Instruction(object):
     # name : (magic, waddr)
     waddrs = {
             'null' : (1, 6),
+            'tlb' : (1, 7),
+            'tlbu' : (1, 8),
+            'tmu' : (1, 9),
+            'tmul' : (1, 10),
             'tmud' : (1, 11),
             'tmua' : (1, 12),
+            'tmuau' : (1, 13),
+            'vpm' : (1, 14),
+            'vpmu' : (1, 15),
+            'sync' : (1, 16),
+            'syncu' : (1, 17),
+            'syncb' : (1, 18),
+            'recip' : (1, 19),
+            'rsqrt' : (1, 20),
+            'exp' : (1, 21),
+            'log' : (1, 22),
+            'sin' : (1, 23),
+            'rsqrt2' : (1, 24),
+            'tmuc' : (1, 32),
+            'tmus' : (1, 33),
+            'tmut' : (1, 34),
+            'tmur' : (1, 35),
+            'tmui' : (1, 36),
+            'tmub' : (1, 37),
+            'tmudref' : (1, 38),
+            'tmuoff' : (1, 39),
+            'tmuscm' : (1, 40),
+            'tmusf' : (1, 41),
+            'tmuslod' : (1, 42),
+            'tmuhs' : (1, 43),
+            'tmuhscm' : (1, 44),
+            'tmuhsf' : (1, 45),
+            'tmuhslod' : (1, 46),
+            'r5rep' : (1, 55),
     }
     for i in range(6):
         waddrs[f'r{i}'] = (1, i)
@@ -61,44 +93,150 @@ class Instruction(object):
     add_ops = {
             'add' : 56,
             'sub' : 60,
+            'min' : 120,
+            'max' : 121,
+            'umin' : 122,
+            'umax' : 123,
             'shl' : 124,
             'shr' : 125,
+            'asr' : 126,
+            'ror' : 127,
             'band' : 181,
             'bor' : 182,
             'bxor' : 183,
 
+            'bnot' : 186,
+            'neg' : 186,
+            'flapush' : 186,
+            'flbpush' : 186,
+            'flpop' : 186,
+            'op_recip' : 186,
+            'setmsf' : 186,
+            'setrevf' : 186,
+
             'nop' : 187,
             'tidx' : 187,
             'eidx' : 187,
+            'lr' : 187,
+            'vfla' : 187,
+            'vflna' : 187,
+            'vflb' : 187,
+            'vflnb' : 187,
+            'msf' : 187,
+            'revf' : 187,
+            'iid' : 187,
+            'sampid' : 187,
+            'barrierid' : 187,
             'tmuwt' : 187,
+            'vpmwt' : 187,
+
+            'op_rsqrt' : 188,
+            'op_exp' : 188,
+            'op_log' : 188,
+            'op_sin' : 188,
+            'op_rsqrt2' : 188,
+
+            # The stvpms are distinguished by the waddr field.
+            'stvpmv' : 248,
+            'stvpmd' : 248,
+            'stvpmp' : 248,
+
+            'clz' : 252,
     }
+    for i in range(0, 48):
+        # FADD is FADDNF depending on the order of the mux_a/mux_b.
+        add_ops[f'fadd{i}'] = i
+        add_ops[f'faddnf{i}'] = i
+    for i in range(64, 112):
+        add_ops[f'fsub{i}'] = i
+    for i in range(128, 176):
+        add_ops[f'fmin{i}'] = i
+        add_ops[f'fmax{i}'] = i
 
     add_op_mux_a = {
             'nop' : 0,
             'tidx' : 1,
             'eidx' : 2,
+            'lr' : 3,
+            'vfla' : 4,
+            'vflna' : 5,
+            'vflb' : 6,
+            'vflnb' : 7,
+
+            'msf' : 0,
+            'revf' : 1,
+            'iid' : 2,
+            'sampid' : 3,
+            'barrierid' : 4,
             'tmuwt' : 5,
+            'vpmwt' : 6,
     }
 
     add_op_mux_b = {
+            'bnot' : 0,
+            'neg' : 1,
+            'flapush' : 2,
+            'flbpush' : 3,
+            'flpop' : 4,
+            'op_recip' : 5,
+            'setmsf' : 6,
+            'setrevf' : 7,
+
             'nop' : 0,
             'tidx' : 0,
             'eidx' : 0,
+            'lr' : 0,
+            'vfla' : 0,
+            'vflna' : 0,
+            'vflb' : 0,
+            'vflnb' : 0,
+
+            'msf' : 2,
+            'revf' : 2,
+            'iid' : 2,
+            'sampid' : 2,
+            'barrierid' : 2,
             'tmuwt' : 2,
+            'vpmwt' : 2,
+
+            'op_rsqrt' : 3,
+            'op_exp' : 4,
+            'op_log' : 5,
+            'op_sin' : 6,
+            'op_rsqrt2' : 7,
+
+            'clz' : 3,
     }
 
     mul_ops = {
             'add' : 1,
             'sub' : 2,
+            'umul24' : 3,
+            'smul24' : 9,
+            'multop' : 10,
+            'fmov' : 14,
+
+            'fmov_0' : 15,
+            'fmov_1' : 15,
+            'fmov_2' : 15,
+            'fmov_3' : 15,
             'nop' : 15,
+            'mov' : 15,
     }
+    for i in range(16, 64):
+        mul_ops[f'fmul{i}'] = i
 
     mul_op_mux_a = {
             'nop' : 0,
     }
 
     mul_op_mux_b = {
+            'fmov_0' : 0,
+            'fmov_1' : 1,
+            'fmov_2' : 2,
+            'fmov_3' : 3,
             'nop' : 4,
+            'mov' : 7,
     }
 
     # Don't ask me why...
