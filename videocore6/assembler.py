@@ -63,9 +63,9 @@ class Instruction(object):
             'sub' : 60,
             'shl' : 124,
             'shr' : 125,
-            'and' : 181,
-            'or' : 182,
-            'xor' : 183,
+            'band' : 181,
+            'bor' : 182,
+            'bxor' : 183,
 
             'nop' : 187,
             'tidx' : 187,
