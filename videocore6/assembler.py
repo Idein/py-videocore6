@@ -248,7 +248,7 @@ class Instruction(object):
         elif self.sig == {'ldunif'}:
             return 2
         elif self.sig == {'ldtmu'}:
-            return 3
+            return 4
         elif self.sig == {'smimm'}:
             return 15
         elif self.sig == {'rot'}:
