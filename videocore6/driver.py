@@ -1,4 +1,5 @@
 
+import sys
 import mmap
 from videocore6.buffer_to_ptr import buffer_to_ptr
 from videocore6.drm_v3d import DRM_V3D
@@ -141,6 +142,14 @@ class Driver(object):
             raise DriverError('Data too large')
 
         return arr
+
+    def dump_program(self, prog, *args, **kwargs):
+        file = kwargs.pop('file') if 'file' in kwargs else sys.stdout
+        asm = Assembly()
+        prog(asm, *args, **kwargs)
+        asm.finalize()
+        for insn in asm:
+            print(f'{int(insn):#018x}', file = file)
 
     def program(self, prog, *args, **kwargs):
 
