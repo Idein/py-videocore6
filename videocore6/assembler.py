@@ -138,6 +138,7 @@ class Instruction(object):
             elif self.cond_add in conds_insn.keys():
                 cond_add_type = 'insn'
         else:
+            self.cond_add = ''
             cond_add_type = ''
 
         if self.cond_mul is not None:
@@ -146,6 +147,7 @@ class Instruction(object):
             elif self.cond_mul in conds_insn.keys():
                 cond_mul_type = 'insn'
         else:
+            self.cond_mul = ''
             cond_mul_type = ''
 
         # Don't ask me why again...
