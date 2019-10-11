@@ -77,9 +77,9 @@ def qpu_tmu_write(asm):
         #   instruction condition.
         # - When writing to tmua register, address is taken from element 0, 4,
         #   8, 12 for each quad.
-        # - If two or more elements in a quad write to tmud register at the same
-        #   time, the data of the element with the largest element index in the
-        #   quad is used.
+        # - If two or more elements in a quad write address to tmua register at
+        #   the same time, the data (not address) of the element with the
+        #   largest element index in the quad is used.
         for i in range(4):
             bor(tmud, rf0, rf0).sub(null, r0, i, cond = 'pushz')
             add(tmua, r5, i * 4, cond = 'ifa')
