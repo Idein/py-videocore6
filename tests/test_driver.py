@@ -2,6 +2,7 @@
 from videocore6.driver import Driver
 
 def test_mem():
+    print()
 
     with Driver() as drv:
 
