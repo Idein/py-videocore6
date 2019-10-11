@@ -70,7 +70,16 @@ def qpu_tmu_write(asm):
         eidx(r0)
         band(r0, r0, 0b11)
 
-        # TMU writes just four elements at once without uniforms (it seems).
+        # From our preliminary experiments, it seems that:
+        # - TMU writes just four elements at once without uniforms.
+        # - Data written to tmud register are consumed when address is written
+        #   to tmua register, even if the write to tmua register is gated by
+        #   instruction condition.
+        # - When writing to tmua register, address is taken from element 0, 4,
+        #   8, 12 for each quad.
+        # - If two or more elements in a quad write to tmud register at the same
+        #   time, the data of the element with the largest element index in the
+        #   quad is used.
         for i in range(4):
             bor(tmud, rf0, rf0).sub(null, r0, i, cond = 'pushz')
             add(tmua, r5, i * 4, cond = 'ifa')
