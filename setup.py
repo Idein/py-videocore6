@@ -1,4 +1,5 @@
 
+from videocore6 import __version__ as version
 from distutils.core import setup
 from Cython.Build import cythonize
 
@@ -8,7 +9,7 @@ setup(
         packages = [
                 'videocore6',
         ],
-        version = '0.0.0',
+        version = version,
         description = 'Python library for GPGPU programming on Raspberry Pi 4',
         author = 'Sugizaki Yukimasa',
         author_email = 'ysugi@idein.jp',
