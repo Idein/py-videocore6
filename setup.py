@@ -16,4 +16,9 @@ setup(
                         'language_level' : 3,
                 },
         ),
+        install_requires = [
+            "ioctl-opt >= 1.2",
+            "Cython",
+            "numpy",
+        ],
 )

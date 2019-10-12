@@ -1,3 +1,0 @@
-ioctl-opt >= 1.2
-Cython
-numpy
