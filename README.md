@@ -34,17 +34,16 @@ now.
 ## Installation
 
 ```
-$ git clone https://github.com/Idein/py-videocore6.git
-$ cd py-videocore6/
-$ pip3 install --user --requirement requirements.txt
-$ python3 setup.py build
-$ python3 setup.py install --user
+$ pip3 install --user cython
+$ pip3 install --user git+https://github.com/Idein/py-videocore6.git
 ```
 
 ## Testing
 
 ```
+$ git clone https://github.com/Idein/py-videocore6.git
+$ cd py-videocore6/
 $ python3 setup.py build_ext --inplace
-$ pip3 install nose
+$ pip3 install --user nose
 $ nosetests -v -s
 ```
