@@ -22,8 +22,8 @@ setup(
                 },
         ),
         install_requires = [
-                "ioctl-opt >= 1.2",
-                "Cython",
-                "numpy",
+                'ioctl-opt >= 1.2',
+                'Cython',
+                'numpy',
         ],
 )
