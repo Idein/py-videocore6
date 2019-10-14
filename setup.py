@@ -16,4 +16,5 @@ setup(
                 'ioctl-opt >= 1.2',
                 'numpy',
         ],
+        python_requires = '~= 3.7',  # for f-string.
 )
