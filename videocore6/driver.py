@@ -1,7 +1,6 @@
 
 import sys
 import mmap
-from videocore6.buffer_to_ptr import buffer_to_ptr
 from videocore6.drm_v3d import DRM_V3D
 from videocore6.assembler import Assembly
 import numpy as np
@@ -99,7 +98,7 @@ class Driver(object):
             self.memory = Memory(self.drm, total_size)
 
             self.handles = np.array([self.memory.handle], dtype = np.uint32)
-            self.bo_handles = buffer_to_ptr(self.handles)
+            self.bo_handles = self.handles.ctypes.data
 
         except Exception as e:
 

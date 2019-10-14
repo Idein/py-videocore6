@@ -1,7 +1,6 @@
 
+from setuptools import setup
 from videocore6 import __version__ as version
-from distutils.core import setup
-from Cython.Build import cythonize
 
 
 setup(
@@ -13,17 +12,8 @@ setup(
         description = 'Python library for GPGPU programming on Raspberry Pi 4',
         author = 'Sugizaki Yukimasa',
         author_email = 'ysugi@idein.jp',
-        ext_modules = cythonize(
-                module_list = [
-                        'videocore6/buffer_to_ptr.pyx',
-                ],
-                compiler_directives = {
-                        'language_level' : 3,
-                },
-        ),
         install_requires = [
                 'ioctl-opt >= 1.2',
-                'Cython',
                 'numpy',
         ],
 )
