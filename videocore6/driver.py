@@ -97,8 +97,7 @@ class Driver(object):
 
             self.memory = Memory(self.drm, total_size)
 
-            self.handles = np.array([self.memory.handle], dtype = np.uint32)
-            self.bo_handles = self.handles.ctypes.data
+            self.bo_handles = np.array([self.memory.handle], dtype = np.uint32)
 
         except Exception as e:
 
@@ -115,7 +114,6 @@ class Driver(object):
 
         self.drm = None
         self.memory = None
-        self.handles = None
         self.bo_handles = None
 
     def __enter__(self):
@@ -174,7 +172,7 @@ class Driver(object):
 
         return code
 
-    def execute(self, code, uniforms = None, timeout_sec = 10000):
+    def execute(self, code, uniforms = None, timeout_sec = 10):
 
         self.drm.v3d_submit_csd(
                 cfg = [
@@ -189,12 +187,13 @@ class Driver(object):
                 ],
                 # Not used in the driver.
                 coef = [0, 0, 0, 0],
-                bo_handles = self.bo_handles,
-                bo_handle_count = len(self.handles),
+                bo_handles = self.bo_handles.ctypes.data,
+                bo_handle_count = len(self.bo_handles),
                 in_sync = 0,
                 out_sync = 0,
         )
 
         # XXX: Separate function
-        for handle in self.handles:
-            self.drm.v3d_wait_bo(handle, timeout_ns = int(timeout_sec / 1e-9))
+        for bo_handle in self.bo_handles:
+            self.drm.v3d_wait_bo(bo_handle,
+                    timeout_ns = int(timeout_sec / 1e-9))
