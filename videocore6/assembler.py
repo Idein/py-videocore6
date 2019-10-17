@@ -93,8 +93,8 @@ class Instruction(object):
     add_ops = {
             'add' : 56,
             'sub' : 60,
-            'min' : 120,
-            'max' : 121,
+            'imin' : 120,
+            'imax' : 121,
             'umin' : 122,
             'umax' : 123,
             'shl' : 124,
