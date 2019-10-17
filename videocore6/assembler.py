@@ -241,20 +241,36 @@ class Instruction(object):
 
     # Don't ask me why...
     def sig_to_num(self):
-        if self.sig == set():
-            return 0
-        elif self.sig == {'thrsw'}:
-            return 1
-        elif self.sig == {'ldunif'}:
-            return 2
-        elif self.sig == {'ldtmu'}:
-            return 4
-        elif self.sig == {'smimm'}:
-            return 15
-        elif self.sig == {'rot'}:
-            return 23
-        elif self.sig == {'smimm', 'ldtmu'}:
-            return 31
+        sigs = {
+                frozenset() : 0,
+                frozenset(['thrsw']) : 1,
+                frozenset(['ldunif']) : 2,
+                frozenset(['thrsw', 'ldunif']) : 3,
+                frozenset(['ldtmu']) : 4,
+                frozenset(['thrsw', 'ldtmu']) : 5,
+                frozenset(['ldtmu', 'ldunif']) : 6,
+                frozenset(['thrsw', 'ldtmu', 'ldunif']) : 7,
+                frozenset(['ldvary']) : 8,
+                frozenset(['thrsw', 'ldvary']) : 9,
+                frozenset(['ldvary', 'ldunif']) : 10,
+                frozenset(['thrsw', 'ldvary', 'ldunif']) : 11,
+                frozenset(['ldunifrf']) : 12,
+                frozenset(['thrsw', 'ldunifrf']) : 13,
+                frozenset(['smimm', 'ldvary']) : 14,
+                frozenset(['smimm']) : 15,
+                frozenset(['ldtlb']) : 16,
+                frozenset(['ldtlbu']) : 17,
+                frozenset(['wrtmuc']) : 18,
+                frozenset(['thrsw', 'wrtmuc']) : 19,
+                frozenset(['ldvary', 'wrtmuc']) : 20,
+                frozenset(['thrsw', 'ldvary', 'wrtmuc']) : 21,
+                frozenset(['ucb']) : 22,
+                frozenset(['rot']) : 23,
+                frozenset(['ldunifa']) : 24,
+                frozenset(['ldunifarf']) : 25,
+                frozenset(['smimm', 'ldtmu']) : 31,
+        }
+        return sigs[frozenset(self.sig)]
 
     def cond_to_num(self):
         conds_push = {
@@ -456,7 +472,7 @@ class Instruction(object):
 
             if sig is not None:
                 if isinstance(sig, str):
-                    insn.sig.add(sig)
+                    insn.sig = insn.sig.union(sig.split())
                 elif isinstance(sig, (list, tuple)):
                     insn.sig = insn.sig.union(sig)
                 else:
