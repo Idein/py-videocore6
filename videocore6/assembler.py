@@ -545,6 +545,7 @@ def qpu(func):
     @functools.wraps(func)
     def decorator(asm, *args, **kwargs):
         g = func.__globals__
+        g_orig = g.copy()
         g['L'] = Label(asm)
         g['R'] = Reference()
         g['b'] = functools.partial(Instruction, asm, 'b')
@@ -553,5 +554,8 @@ def qpu(func):
         for waddr in Instruction.waddrs.keys():
             g[waddr] = waddr
         func(asm, *args, **kwargs)
+        g.clear()
+        for key, value in g_orig.items():
+            g[key] = value
 
     return decorator
