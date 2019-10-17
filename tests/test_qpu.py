@@ -52,45 +52,26 @@ def qpu_tmu_write(asm):
     nop(null, sig = 'ldunif')
     bor(r1, r5, r5, sig = 'ldunif')
 
-    eidx(rf0)
-
-    # r5 += eidx * 4
-    eidx(r0)
-    shl(r0, r0, 2)
-    add(r5, r5, r0)
+    # r2 = addr + eidx * 4
+    # rf0 = eidx
+    eidx(r0).mov(r2, r5)
+    shl(r0, r0, 2).mov(rf0, r0)
+    add(r2, r2, r0)
 
     L.loop
     if True:
 
         # rf0: Data to be written.
         # r0: Overwritten.
-        # r5: Address to write data to.
+        # r2: Address to write data to.
 
-        # r0 = eidx & 0b11
-        eidx(r0)
-        band(r0, r0, 0b11)
-
-        # From our preliminary experiments, it seems that:
-        # - TMU writes just four elements at once without uniforms.
-        # - Data written to tmud register are consumed when address is written
-        #   to tmua register, even if the write to tmua register is gated by
-        #   instruction condition.
-        # - When writing to tmua register, address is taken from element 0, 4,
-        #   8, 12 for each quad.
-        # - If two or more elements in a quad write address to tmua register at
-        #   the same time, the data (not address) of the element with the
-        #   largest element index in the quad is used.
-        for i in range(4):
-            sub(null, r0, i, cond = 'pushz').mov(tmud, rf0)
-            add(tmua, r5, i * 4, cond = 'ifa')
-
-        tmuwt(null).sub(r1, r1, 1, cond = 'pushz')
+        sub(r1, r1, 1, cond = 'pushz').mov(tmud, rf0)
         b(R.loop, cond = 'anyna')
         # rf0 += 16
-        sub(rf0, rf0, -16)
-        # r5 += 64
+        sub(rf0, rf0, -16).mov(tmua, r2)
+        # r2 += 64
         shl(r0, 4, 4)
-        add(r5, r5, r0)
+        tmuwt(null).add(r2, r2, r0)
 
     nop(null, sig = 'thrsw')
     nop(null, sig = 'thrsw')
