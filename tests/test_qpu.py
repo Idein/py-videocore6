@@ -104,3 +104,61 @@ def test_tmu_write():
 
         assert all(data == range(n * 16))
 
+
+@qpu
+def qpu_tmu_read(asm):
+
+    # r0: Number of vectors to read.
+    # r1: Pointer to the read vectors + eidx * 4.
+    # r2: Pointer to the write vectors + eidx * 4
+    eidx(r2, sig = 'ldunif')
+    nop(null, sig = 'ldunif').mov(r0, r5)
+    shl(r2, r2, 2).mov(r1, r5)
+    add(r1, r1, r2, sig = 'ldunif')
+    add(r2, r5, r2)
+
+    L.loop
+    if True:
+
+        nop(null).mov(tmua, r1, sig = 'thrsw')
+        nop(null)
+        nop(null)
+        nop(rf0, sig = 'ldtmu')
+
+        sub(r0, r0, 1, cond = 'pushz').add(tmud, rf0, 1)
+        b(R.loop, cond = 'anyna')
+        shl(r3, 4, 4).mov(tmua, r2)
+        # r1 += 64
+        # r2 += 64
+        add(r1, r1, r3).add(r2, r2, r3)
+        tmuwt(null)
+
+    nop(null, sig = 'thrsw')
+    nop(null, sig = 'thrsw')
+    nop(null)
+    nop(null)
+    nop(null, sig = 'thrsw')
+    nop(null)
+    nop(null)
+    nop(null)
+
+
+def test_tmu_read():
+    print()
+
+    n = 4096
+
+    with Driver() as drv:
+
+        code = drv.program(qpu_tmu_read)
+        data = drv.alloc(n * 16, dtype = 'uint32')
+        unif = drv.alloc(3, dtype = 'uint32')
+
+        data[:] = range(len(data))
+        unif[0] = n
+        unif[1] = data.addresses()[0]
+        unif[2] = data.addresses()[0]
+
+        drv.execute(code, unif.addresses()[0])
+
+        assert all(data == range(1, n * 16 + 1))
