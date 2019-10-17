@@ -86,7 +86,7 @@ def qpu_tmu_write(asm):
 def test_tmu_write():
     print()
 
-    n = 256 * 1024
+    n = 4096
 
     with Driver(data_area_size = n * 16 * 4 + 2 * 4) as drv:
 
@@ -104,5 +104,3 @@ def test_tmu_write():
 
         assert all(data == range(n * 16))
 
-        print(f'{end - start} sec')
-        print(f'{data.nbytes / (end - start) / 1000 / 1000} MB/s')
