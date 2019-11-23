@@ -33,6 +33,8 @@ now.
 
 ## Installation
 
+You can install `py-videocore6` directly using `pip`:
+
 ```
 $ apt-get update
 $ apt-get install python3-pip
@@ -46,4 +48,14 @@ $ pip3 install --user nose
 $ git clone https://github.com/Idein/py-videocore6.git
 $ cd py-videocore6/
 $ nosetests -v -s
+```
+
+## Running examples
+
+After installing `py-videocore6`:
+
+```
+$ git clone https://github.com/Idein/py-videocore6.git
+$ cd py-videocore6/
+$ python3 examples/sgemm.py
 ```
