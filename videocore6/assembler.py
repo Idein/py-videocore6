@@ -416,24 +416,14 @@ class Instruction(object):
 
         def manage_src(self, insn, src):
 
-            try:
-                smimm_int = int(src)
-            except ValueError:
-                is_smimm_int = False
-                try:
-                    smimm_float = float(src)
-                except ValueError:
-                    is_smimm_float = False
-                else:
-                    is_smimm_float = True
-            else:
-                is_smimm_int = True
+            is_smimm_int = isinstance(src, int)
+            is_smimm_float = isinstance(src, float)
 
             if is_smimm_int or is_smimm_float:
                 if is_smimm_int:
-                    rb = self.smimms_int[smimm_int]
+                    rb = self.smimms_int[src]
                 elif is_smimm_float:
-                    rb = self.smimms_float[smimm_float]
+                    rb = self.smimms_float[src]
                 if insn.raddr_b is None:
                     insn.raddr_b = rb
                     insn.sig.add('smimm')
