@@ -58,4 +58,14 @@ After installing `py-videocore6`:
 $ git clone https://github.com/Idein/py-videocore6.git
 $ cd py-videocore6/
 $ python3 examples/sgemm.py
+==== sgemm example (123x567 times 567x512) ====
+numpy: 0.03433 sec, 2.086 Gflop/s
+QPU:   0.8327 sec, 0.08599 Gflop/s
+Minimum absolute error: 0.0
+Maximum absolute error: 0.0
+Minimum relative error: 0.0
+Maximum relative error: 0.0
 ```
+
+Note that the current implementation of sgemm is seriously naive, and therefore
+the performance is low at least for now.
