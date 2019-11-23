@@ -272,7 +272,16 @@ class Instruction(object):
         }
         return sigs[frozenset(self.sig)]
 
+    def sig_writes(self):
+        # XXX: What if multiple loads are issued?
+        return len(self.sig.intersection([
+                'ldunifrf', 'ldunifarf', 'ldvary', 'ldtmu', 'ldtlb', 'ldtlbu'
+        ])) > 0
+
     def cond_to_num(self):
+        if self.sig_writes():
+            return (self.sig_magic << 6) | self.sig_waddr
+
         conds_push = {
                 '' : 0,
                 'pushz' : 1,
@@ -342,6 +351,8 @@ class Instruction(object):
         self.finalized = False
 
         self.sig = set()
+        self.sig_magic, self.sig_waddr = self.waddrs['null']
+
         self.cond_add = None
         self.cond_mul = None
 
@@ -472,6 +483,14 @@ class Instruction(object):
 
             self.op = self.ops[opr]
 
+            if insn.sig_writes():
+                if (self.cond is not None and self.cond != '') or \
+                        (insn.cond_add is not None and insn.cond_add != ''):
+                    raise AssembleError('cond must be none with sig write')
+                # XXX: Don't specify dest regs to both add and mul for now!
+                insn.sig_magic, insn.sig_waddr = Instruction.waddrs[dst]
+                return
+
             self.magic, self.waddr = Instruction.waddrs[dst]
 
             if src1 is None:
@@ -494,10 +513,11 @@ class Instruction(object):
             super().__init__(insn, *args, **kwargs)
             insn.cond_add = self.cond
             insn.op_add = self.op
-            insn.ma = self.magic
-            insn.waddr_a = self.waddr
-            insn.add_a = self.mux_a
-            insn.add_b = self.mux_b
+            if not insn.sig_writes():
+                insn.ma = self.magic
+                insn.waddr_a = self.waddr
+                insn.add_a = self.mux_a
+                insn.add_b = self.mux_b
 
 
     class MulALU(ALU):
@@ -509,10 +529,11 @@ class Instruction(object):
             super().__init__(insn, *args, **kwargs)
             insn.cond_mul = self.cond
             insn.op_mul = self.op
-            insn.mm = self.magic
-            insn.waddr_m = self.waddr
-            insn.mul_a = self.mux_a
-            insn.mul_b = self.mux_b
+            if not insn.sig_writes():
+                insn.mm = self.magic
+                insn.waddr_m = self.waddr
+                insn.mul_a = self.mux_a
+                insn.mul_b = self.mux_b
 
     class Branch(object):
 
