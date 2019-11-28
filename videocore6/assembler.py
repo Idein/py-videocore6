@@ -463,7 +463,7 @@ class Instruction(object):
             else:
                 raise AssembleError(f'Unknown source register {src}')
 
-        def __init__(self, insn, opr, dst, src1 = None, src2 = None,
+        def __init__(self, insn, opr, dst='null', src1 = None, src2 = None,
                 cond = None, sig = None):
             # XXX: With Python >= 3.8 we can use positional-only params.
             if src1 is None and src2 is not None:
