@@ -283,10 +283,23 @@ class Instruction(object):
             return (self.sig_magic << 6) | self.sig_waddr
 
         conds_push = {
-                '' : 0,
                 'pushz' : 1,
                 'pushn' : 2,
                 'pushc' : 3,
+        }
+        conds_update = {
+                'andz': 4,
+                'andnz': 5,
+                'nornz': 6,
+                'norz': 7,
+                'andn': 8,
+                'andnn': 9,
+                'nornn': 10,
+                'norn': 11,
+                'andc': 12,
+                'andnc': 13,
+                'nornc': 14,
+                'norc': 15,
         }
         conds_insn = {
                 'ifa' : 0,
@@ -295,43 +308,48 @@ class Instruction(object):
                 'ifnb' : 3,
         }
 
-        if self.cond_add is not None:
-            if self.cond_add in conds_push.keys():
-                cond_add_type = 'push'
-            elif self.cond_add in conds_insn.keys():
-                cond_add_type = 'insn'
-        else:
-            self.cond_add = ''
-            cond_add_type = ''
+        add_insn = 1 * int(self.cond_add in conds_insn.keys())
+        add_push = 2 * int(self.cond_add in conds_push.keys())
+        add_update = 3 * int(self.cond_add in conds_update.keys())
 
-        if self.cond_mul is not None:
-            if self.cond_mul in conds_push.keys():
-                cond_mul_type = 'push'
-            elif self.cond_mul in conds_insn.keys():
-                cond_mul_type = 'insn'
-        else:
-            self.cond_mul = ''
-            cond_mul_type = ''
+        mul_insn = 1 * int(self.cond_mul in conds_insn.keys())
+        mul_push = 2 * int(self.cond_mul in conds_push.keys())
+        mul_update = 3 * int(self.cond_mul in conds_update.keys())
 
-        # Don't ask me why again...
-        if cond_add_type == '' and cond_mul_type == '':
-            return 0b0000000
-        elif cond_add_type == 'push' and cond_mul_type == '':
-            return conds_push[self.cond_add]
-        elif cond_add_type == '' and cond_mul_type == 'push':
-            return 0b0010000 | conds_push[self.cond_mul]
-        elif cond_add_type == 'insn' and cond_mul_type == 'insn':
-            return 0b1000000 \
-                    | (conds_insn[self.cond_mul] << 4) \
-                    | conds_insn[self.cond_add]
-        elif cond_add_type == 'insn' and cond_mul_type in ['', 'push']:
-            return 0b0100000 \
-                    | (conds_insn[self.cond_add] << 2) \
-                    | conds_push[self.cond_mul]
-        elif cond_add_type in ['', 'push'] and cond_mul_type == 'insn':
-            return 0b0110000 \
-                    | (conds_insn[self.cond_mul] << 2) \
-                    | conds_push[self.cond_add]
+        add_cond = add_insn + add_push + add_update
+        mul_cond = mul_insn + mul_push + mul_update
+
+        result = [
+            #     none | add_insn | add_push | add_update
+            [         0, 0b0100000,         0,         0 ], # none
+            [ 0b0110000, 0b1000000, 0b0110000, 0b1000000 ], # mul_insn
+            [ 0b0010000, 0b0100000,      None,      None ], # mul_push
+            [ 0b0010000,      None,      None,      None ], # mul_update
+        ][mul_cond][add_cond]
+
+        assert(result is not None)
+
+        if add_push > 0:
+            result |= conds_push[self.cond_add]
+        if mul_push > 0:
+            result |= conds_push[self.cond_mul]
+        if add_update > 0:
+            result |= conds_update[self.cond_add]
+        if mul_update > 0:
+            result |= conds_update[self.cond_mul]
+        if mul_insn > 0:
+            if add_insn > 0:
+                result |= conds_insn[self.cond_mul] << 4
+                result |= conds_insn[self.cond_add]
+            elif add_update > 0:
+                result |= conds_insn[self.cond_mul] << 4
+            else:
+                result |= conds_insn[self.cond_mul] << 2
+        elif add_insn > 0:
+            result |= conds_insn[self.cond_add] << 2
+
+        return result
+
 
     def cond_br_to_num(self):
         return {
