@@ -27,7 +27,7 @@ def qpu_sgemm_rnn_naive(asm):
 
     for reg in ['A_i', 'B_i', 'C_j', 'alpha', 'beta', 'P', 'Q', 'R']:
         nop(null, sig = 'ldunif')
-        nop(null).mov(g['reg_' + reg], r5)
+        mov(g['reg_' + reg], r5)
 
     # B_i += 4 * eidx
     # C_j += 4 * eidx
@@ -40,26 +40,26 @@ def qpu_sgemm_rnn_naive(asm):
     shl(reg_4_Q, reg_Q, 2)
     shl(reg_4_R, reg_R, 2)
 
-    nop(null).mov(reg_i, reg_P)
+    mov(reg_i, reg_P)
 
     L.loop_i
     if True:
 
         shr(reg_j, reg_R, 4)
-        nop(null).mov(reg_B_j, reg_B_i)
+        mov(reg_B_j, reg_B_i)
 
         L.loop_j
         if True:
 
-            bor(reg_A_k, reg_A_i, reg_A_i).mov(reg_B_k, reg_B_j)
-            bor(r0, 0., 0.).mov(reg_k, reg_Q)
+            mov(reg_A_k, reg_A_i).mov(reg_B_k, reg_B_j)
+            mov(r0, 0.).mov(reg_k, reg_Q)
 
             L.loop_k
             if True:
 
-                nop(null).mov(tmua, reg_A_k, sig = 'thrsw')
+                mov(tmua, reg_A_k, sig = 'thrsw')
                 sub(reg_k, reg_k, 1, cond = 'pushz')
-                nop(null).mov(tmua, reg_B_k, sig = 'thrsw')
+                mov(tmua, reg_B_k, sig = 'thrsw')
                 nop(r1, sig = 'ldtmu')
                 nop(r2, sig = 'ldtmu')
 
@@ -68,7 +68,7 @@ def qpu_sgemm_rnn_naive(asm):
                 fadd5(r0, r0, r1).add(reg_A_k, reg_A_k, 4)
                 add(reg_B_k, reg_B_k, reg_4_R)
 
-            nop(null).mov(tmua, reg_C_j, sig = 'thrsw')
+            mov(tmua, reg_C_j, sig = 'thrsw')
             nop(null).fmul21(r0, r0, reg_alpha)
             sub(reg_j, reg_j, 1, cond = 'pushz')
             nop(r1, sig = 'ldtmu')
