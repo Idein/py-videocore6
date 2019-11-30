@@ -50,7 +50,7 @@ def test_clock():
 def qpu_tmu_write(asm):
 
     nop(null, sig = 'ldunif')
-    bor(r1, r5, r5, sig = 'ldunif')
+    mov(r1, r5, sig = 'ldunif')
 
     # r2 = addr + eidx * 4
     # rf0 = eidx
@@ -112,7 +112,7 @@ def qpu_tmu_read(asm):
     # r1: Pointer to the read vectors + eidx * 4.
     # r2: Pointer to the write vectors + eidx * 4
     eidx(r2, sig = 'ldunif')
-    nop(null, sig = 'ldunif').mov(r0, r5)
+    mov(r0, r5, sig = 'ldunif')
     shl(r2, r2, 2).mov(r1, r5)
     add(r1, r1, r2, sig = 'ldunif')
     add(r2, r5, r2)
@@ -120,7 +120,7 @@ def qpu_tmu_read(asm):
     L.loop
     if True:
 
-        nop(null).mov(tmua, r1, sig = 'thrsw')
+        mov(tmua, r1, sig = 'thrsw')
         nop(null)
         nop(null)
         nop(rf0, sig = 'ldtmu')
