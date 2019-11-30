@@ -568,6 +568,19 @@ class Instruction(object):
                 insn.bdi = 1
                 insn.addr_label = src
 
+def mov(asm, dst, src, **kwargs):
+    return Instruction(asm, 'bor', dst, src, src, **kwargs)
+
+_alias_ops = [
+    mov,
+    # TODO: impl these aliases for happy programming
+    # fadd,
+    # faddnf,
+    # fsub,
+    # fmin,
+    # fmax,
+    # fmul,
+]
 
 def qpu(func):
 
@@ -580,6 +593,8 @@ def qpu(func):
         g['b'] = functools.partial(Instruction, asm, 'b')
         for add_op in Instruction.add_ops.keys():
             g[add_op] = functools.partial(Instruction, asm, add_op)
+        for alias_op in _alias_ops:
+            g[alias_op.__name__] = functools.partial(alias_op, asm)
         for waddr in Instruction.waddrs.keys():
             g[waddr] = waddr
         func(asm, *args, **kwargs)
