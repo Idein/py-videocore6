@@ -45,54 +45,116 @@ class Reference(str):
         return name
 
 
+class Register(object):
+
+    OUTPUT_MODIFIER = {
+        # modifier: (f32, f16)
+        'none' : 0,
+        'l' : 1,
+        'h' : 2,
+    }
+
+    INPUT_MODIFIER = {
+        # modifier: (f32, f16)
+        'none' : (1, 0),
+        'abs' : (0, None),
+        'l' : (2, None),
+        'h' : (3, None),
+        'r32' : (None, 1),
+        'rl2h' : (None, 2),
+        'rh2l' : (None, 3),
+        'swap' : (None, 4),
+    }
+
+    def __init__(self, name, magic, waddr, pack = 'none', unpack = 'none'):
+        self.name = name
+        self.magic = magic
+        self.waddr = waddr
+        self.pack_bits = Register.OUTPUT_MODIFIER[pack]
+        self.unpack_bits = Register.INPUT_MODIFIER[unpack]
+
+    def pack(self, modifier):
+        assert self.pack_bits == Register.OUTPUT_MODIFIER['none']
+        return Register(self.name, self.magic, self.waddr, pack = modifier)
+
+    def unpack(self, modifier):
+        assert self.unpack_bits == Register.INPUT_MODIFIER['none']
+        return Register(self.name, self.magic, self.waddr, unpack = modifier)
+
 class Instruction(object):
 
-    # name : (magic, waddr)
-    waddrs = {
-            'null' : (1, 6),
-            'tlb' : (1, 7),
-            'tlbu' : (1, 8),
-            'tmu' : (1, 9),
-            'tmul' : (1, 10),
-            'tmud' : (1, 11),
-            'tmua' : (1, 12),
-            'tmuau' : (1, 13),
-            'vpm' : (1, 14),
-            'vpmu' : (1, 15),
-            'sync' : (1, 16),
-            'syncu' : (1, 17),
-            'syncb' : (1, 18),
-            'recip' : (1, 19),
-            'rsqrt' : (1, 20),
-            'exp' : (1, 21),
-            'log' : (1, 22),
-            'sin' : (1, 23),
-            'rsqrt2' : (1, 24),
-            'tmuc' : (1, 32),
-            'tmus' : (1, 33),
-            'tmut' : (1, 34),
-            'tmur' : (1, 35),
-            'tmui' : (1, 36),
-            'tmub' : (1, 37),
-            'tmudref' : (1, 38),
-            'tmuoff' : (1, 39),
-            'tmuscm' : (1, 40),
-            'tmusf' : (1, 41),
-            'tmuslod' : (1, 42),
-            'tmuhs' : (1, 43),
-            'tmuhscm' : (1, 44),
-            'tmuhsf' : (1, 45),
-            'tmuhslod' : (1, 46),
-            'r5rep' : (1, 55),
+    REGISTERS = {
+        name: Register(name, 1, addr)
+        for addr, name in enumerate([
+            'r0',
+            'r1',
+            'r2',
+            'r3',
+            'r4',
+            'r5',
+            'null',
+            'tlb',
+            'tlbu',
+            'tmu',
+            'tmul',
+            'tmud',
+            'tmua',
+            'tmuau',
+            'vpm',
+            'vpmu',
+            'sync',
+            'syncu',
+            'syncb',
+            'recip',
+            'rsqrt',
+            'exp',
+            'log',
+            'sin',
+            'rsqrt2',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            'tmuc',
+            'tmus',
+            'tmut',
+            'tmur',
+            'tmui',
+            'tmub',
+            'tmudref',
+            'tmuoff',
+            'tmuscm',
+            'tmusf',
+            'tmuslod',
+            'tmuhs',
+            'tmuhscm',
+            'tmuhsf',
+            'tmuhslod',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            '',
+            'r5rep',
+        ])
     }
-    for i in range(6):
-        waddrs[f'r{i}'] = (1, i)
     for i in range(64):
-        waddrs[f'rf{i}'] = (0, i)
+        REGISTERS[f'rf{i}'] = Register(f'rf{i}', 0, i)
+
 
     add_ops = {
+            # FADD is FADDNF depending on the order of the mux_a/mux_b.
+            'fadd' : 0,
+            'faddnf' : 0,
             'add' : 56,
             'sub' : 60,
+            'fsub' : 64,
             'imin' : 120,
             'imax' : 121,
             'umin' : 122,
@@ -101,6 +163,10 @@ class Instruction(object):
             'shr' : 125,
             'asr' : 126,
             'ror' : 127,
+            # FMIN is FMAX depending on the order of the mux_a/mux_b.
+            'fmin' : 128,
+            'fmax' : 128,
+
             'band' : 181,
             'bor' : 182,
             'bxor' : 183,
@@ -141,17 +207,10 @@ class Instruction(object):
             'stvpmd' : 248,
             'stvpmp' : 248,
 
+            'itof' : 252,
             'clz' : 252,
+            'utof' : 252,
     }
-    for i in range(0, 48):
-        # FADD is FADDNF depending on the order of the mux_a/mux_b.
-        add_ops[f'fadd{i}'] = i
-        add_ops[f'faddnf{i}'] = i
-    for i in range(64, 112):
-        add_ops[f'fsub{i}'] = i
-    for i in range(128, 176):
-        add_ops[f'fmin{i}'] = i
-        add_ops[f'fmax{i}'] = i
 
     add_op_mux_a = {
             'nop' : 0,
@@ -205,7 +264,9 @@ class Instruction(object):
             'op_sin' : 6,
             'op_rsqrt2' : 7,
 
+            'itof' : 0,
             'clz' : 3,
+            'utof' : 4,
     }
 
     mul_ops = {
@@ -369,18 +430,21 @@ class Instruction(object):
         self.finalized = False
 
         self.sig = set()
-        self.sig_magic, self.sig_waddr = self.waddrs['null']
+        self.sig_magic = Instruction.REGISTERS['null'].magic
+        self.sig_waddr = Instruction.REGISTERS['null'].waddr
 
         self.cond_add = None
         self.cond_mul = None
 
         self.op_add = self.add_ops['nop']
-        self.ma, self.waddr_a = self.waddrs['null']
+        self.ma = Instruction.REGISTERS['null'].magic
+        self.waddr_a = Instruction.REGISTERS['null'].waddr
         self.add_a = self.add_op_mux_a['nop']
         self.add_b = self.add_op_mux_b['nop']
 
         self.op_mul = self.mul_ops['nop']
-        self.mm, self.waddr_m = self.waddrs['null']
+        self.mm = Instruction.REGISTERS['null'].magic
+        self.waddr_m = Instruction.REGISTERS['null'].waddr
         self.mul_a = self.mul_op_mux_a['nop']
         self.mul_b = self.mul_op_mux_b['nop']
 
@@ -463,8 +527,8 @@ class Instruction(object):
                         raise AssembleError('Small immediates conflict')
                 return 7
 
-            if src.startswith('rf'):
-                idx = int(src[2:])
+            if src.magic == 0:
+                idx = src.waddr
                 assert 0 <= idx <= 63
                 if insn.raddr_a in [None, idx]:
                     insn.raddr_a = idx
@@ -474,10 +538,8 @@ class Instruction(object):
                     return 7
                 else:
                     raise AssembleError('Too many register files read')
-            elif src.startswith('r'):
-                idx = int(src[1:])
-                assert 0 <= idx <= 5
-                return idx
+            elif src.waddr < 6:
+                return src.waddr
             else:
                 raise AssembleError(f'Unknown source register {src}')
 
@@ -506,10 +568,12 @@ class Instruction(object):
                         (insn.cond_add is not None and insn.cond_add != ''):
                     raise AssembleError('cond must be none with sig write')
                 # XXX: Don't specify dest regs to both add and mul for now!
-                insn.sig_magic, insn.sig_waddr = Instruction.waddrs[dst]
+                insn.sig_magic = dst.magic
+                insn.sig_waddr = dst.waddr
                 return
 
-            self.magic, self.waddr = Instruction.waddrs[dst]
+            self.magic = dst.magic
+            self.waddr = dst.waddr
 
             if src1 is None:
                 self.mux_a = self.op_mux_a[opr]
@@ -521,6 +585,21 @@ class Instruction(object):
             else:
                 self.mux_b = self.manage_src(insn, src2)
 
+
+            if opr in ['fadd', 'faddnf', 'fsub', 'fmax', 'fmin']:
+
+                self.op |= dst.pack_bits << 4
+
+                a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else 0
+                b_unpack = src2.unpack_bits[0] if isinstance(src2, Register) else 0
+
+                ordering = a_unpack * 8 + self.mux_a > b_unpack * 8 + self.mux_b
+                if (opr in ['fmin', 'fadd'] and ordering) or (opr in ['fmax', 'faddnf'] and not ordering):
+                    a_unpack, b_unpack = b_unpack, a_unpack
+                    self.mux_a, self.mux_b = self.mux_b, self.mux_a
+
+                self.op |= a_unpack << 2
+                self.op |= b_unpack << 0
 
     class AddALU(ALU):
 
@@ -574,11 +653,6 @@ def mov(asm, dst, src, **kwargs):
 _alias_ops = [
     mov,
     # TODO: impl these aliases for happy programming
-    # fadd,
-    # faddnf,
-    # fsub,
-    # fmin,
-    # fmax,
     # fmul,
 ]
 
@@ -595,8 +669,8 @@ def qpu(func):
             g[add_op] = functools.partial(Instruction, asm, add_op)
         for alias_op in _alias_ops:
             g[alias_op.__name__] = functools.partial(alias_op, asm)
-        for waddr in Instruction.waddrs.keys():
-            g[waddr] = waddr
+        for waddr, reg in Instruction.REGISTERS.items():
+            g[waddr] = reg
         func(asm, *args, **kwargs)
         g.clear()
         for key, value in g_orig.items():
