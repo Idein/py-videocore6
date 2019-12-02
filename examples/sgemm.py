@@ -65,7 +65,7 @@ def qpu_sgemm_rnn_naive(asm):
 
                 b(R.loop_k, cond = 'anyna')
                 nop(null).fmul21(r1, r1, r2)
-                fadd5(r0, r0, r1).add(reg_A_k, reg_A_k, 4)
+                fadd(r0, r0, r1).add(reg_A_k, reg_A_k, 4)
                 add(reg_B_k, reg_B_k, reg_4_R)
 
             mov(tmua, reg_C_j, sig = 'thrsw')
@@ -75,7 +75,7 @@ def qpu_sgemm_rnn_naive(asm):
             nop(null).fmul21(r1, r1, reg_beta)
 
             b(R.loop_j, cond = 'anyna')
-            fadd5(tmud, r0, r1).add(reg_B_j, reg_B_j, reg_64)
+            fadd(tmud, r0, r1).add(reg_B_j, reg_B_j, reg_64)
             add(reg_C_j, reg_C_j, reg_64).mov(tmua, reg_C_j)
             tmuwt(null)
 
