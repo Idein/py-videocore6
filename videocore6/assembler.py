@@ -605,7 +605,7 @@ class Instruction(object):
                 a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else 0
                 b_unpack = src2.unpack_bits[0] if isinstance(src2, Register) else 0
 
-                self.op |= dst.pack_bits << 4
+                self.op += dst.pack_bits << 4
                 self.op |= a_unpack << 2
                 self.op |= b_unpack << 0
 
