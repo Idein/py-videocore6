@@ -6,6 +6,66 @@ import numpy as np
 
 
 @qpu
+def qpu_float_ops(asm):
+
+    eidx(r0, sig = 'ldunif')
+    mov(rf0, r5, sig = 'ldunif') # in
+    shl(r3, 4, 4).mov(rf1, r5)  # out
+
+    shl(r0, r0, 2)
+    add(rf0, rf0, r0)
+    add(rf1, rf1, r0)
+
+    mov(tmua, rf0, sig = 'thrsw').add(rf0, rf0, r3)
+    nop(null)
+    mov(tmua, rf0, sig = 'thrsw').add(rf0, rf0, r3)
+    nop(r1, sig = 'ldtmu')
+    nop(null)
+    nop(r2, sig = 'ldtmu')
+
+    g = globals()
+    for op in ['fadd', 'fsub', 'fmul', 'fmin', 'fmax']:
+        g[op](r0, r1, r2)
+        mov(tmud, r0)
+        mov(tmua, rf1)
+        tmuwt(null).add(rf1, rf1, r3)
+
+    nop(null, sig = 'thrsw')
+    nop(null, sig = 'thrsw')
+    nop(null)
+    nop(null)
+    nop(null, sig = 'thrsw')
+    nop(null)
+    nop(null)
+    nop(null)
+
+def test_float_ops():
+
+    with Driver() as drv:
+
+        code = drv.program(qpu_float_ops)
+        X = drv.alloc((2, 16), dtype = 'float32')
+        Y = drv.alloc((5, 16), dtype = 'float32')
+        unif = drv.alloc(2, dtype = 'uint32')
+
+        X[:] = np.random.randn(*X.shape).astype('float32')
+        Y[:] = 0
+
+        unif[0] = X.addresses()[0,0]
+        unif[1] = Y.addresses()[0,0]
+
+        start = time.time()
+        drv.execute(code, unif.addresses()[0])
+        end = time.time()
+
+        assert (Y[0] == X[0] + X[1]).all()
+        assert (Y[1] == X[0] - X[1]).all()
+        assert (Y[2] == X[0] * X[1]).all()
+        assert (Y[3] == np.minimum(X[0], X[1])).all()
+        assert (Y[4] == np.maximum(X[0], X[1])).all()
+
+
+@qpu
 def qpu_pack(asm):
 
     eidx(r0, sig = 'ldunif')
