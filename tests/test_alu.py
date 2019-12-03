@@ -56,11 +56,19 @@ def boilerplate_pack_unpack_binary_ops(bin_ops, dst, src1, src2):
         'fmin' : np.minimum,
         'fmax' : np.maximum,
         'fmul' : lambda a,b: a * b,
+        'vfpack' : lambda a,b: np.stack([a,b]).T.ravel(),
+        'vfmin' : np.minimum,
+        'vfmax' : np.maximum,
+        'vfmul' : lambda a,b: a * b,
         # pack/unpack flags
         'l' : lambda x: x[0::2],
         'h' : lambda x: x[1::2],
         'none' : lambda x: x,
         'abs' : np.abs,
+        'r32' : lambda x: np.stack([x,x]).T.ravel(),
+        'rl2h' : lambda x: np.stack([x[0::2],x[0::2]]).T.ravel(),
+        'rh2l' : lambda x: np.stack([x[1::2],x[1::2]]).T.ravel(),
+        'swap' : lambda x: np.stack([x[1::2],x[0::2]]).T.ravel(),
     }
 
     with Driver() as drv:
@@ -97,7 +105,20 @@ def test_pack_unpack_binary_ops():
             ['fadd', 'faddnf', 'fsub', 'fmin', 'fmax', 'fmul'],
             dst, src1, src2,
         )
-
+    packs = [(16, ['none'])]
+    unpacks = [(32, ['none']), (16, ['l', 'h'])]
+    for dst, src1, src2 in itertools.product(packs, unpacks, unpacks):
+        boilerplate_pack_unpack_binary_ops(
+            ['vfpack'],
+            dst, src1, src2,
+        )
+    packs = [(16, ['none'])]
+    unpacks = [(32, ['r32']), (16, ['rl2h', 'rh2l', 'swap'])]
+    for dst, src1, src2 in itertools.product(packs, unpacks, packs):
+        boilerplate_pack_unpack_binary_ops(
+            ['vfmin', 'vfmax', 'vfmul'],
+            dst, src1, src2,
+        )
 
 @qpu
 def qpu_pack_unpack_unary_ops(asm, bin_ops, dst_ops, src_ops):
