@@ -7,66 +7,6 @@ import itertools
 
 
 @qpu
-def qpu_float_ops(asm):
-
-    eidx(r0, sig = 'ldunif')
-    mov(rf0, r5, sig = 'ldunif') # in
-    shl(r3, 4, 4).mov(rf1, r5)  # out
-
-    shl(r0, r0, 2)
-    add(rf0, rf0, r0)
-    add(rf1, rf1, r0)
-
-    mov(tmua, rf0, sig = 'thrsw').add(rf0, rf0, r3)
-    nop(null)
-    mov(tmua, rf0, sig = 'thrsw').add(rf0, rf0, r3)
-    nop(r1, sig = 'ldtmu')
-    nop(null)
-    nop(r2, sig = 'ldtmu')
-
-    g = globals()
-    for op in ['fadd', 'fsub', 'fmul', 'fmin', 'fmax']:
-        g[op](r0, r1, r2)
-        mov(tmud, r0)
-        mov(tmua, rf1)
-        tmuwt(null).add(rf1, rf1, r3)
-
-    nop(null, sig = 'thrsw')
-    nop(null, sig = 'thrsw')
-    nop(null)
-    nop(null)
-    nop(null, sig = 'thrsw')
-    nop(null)
-    nop(null)
-    nop(null)
-
-def test_float_ops():
-
-    with Driver() as drv:
-
-        code = drv.program(qpu_float_ops)
-        X = drv.alloc((2, 16), dtype = 'float32')
-        Y = drv.alloc((5, 16), dtype = 'float32')
-        unif = drv.alloc(2, dtype = 'uint32')
-
-        X[:] = np.random.randn(*X.shape).astype('float32')
-        Y[:] = 0
-
-        unif[0] = X.addresses()[0,0]
-        unif[1] = Y.addresses()[0,0]
-
-        start = time.time()
-        drv.execute(code, unif.addresses()[0])
-        end = time.time()
-
-        assert np.allclose(Y[0], X[0] + X[1], rtol=1e-6)
-        assert np.allclose(Y[1], X[0] - X[1], rtol=1e-6)
-        assert np.allclose(Y[2], X[0] * X[1], rtol=1e-6)
-        assert np.allclose(Y[3], np.minimum(X[0], X[1]), rtol=1e-6)
-        assert np.allclose(Y[4], np.maximum(X[0], X[1]), rtol=1e-6)
-
-
-@qpu
 def qpu_pack_unpack_binary_ops(asm, bin_ops, dst_ops, src1_ops, src2_ops):
 
     eidx(r0, sig = 'ldunif')
@@ -125,12 +65,12 @@ def boilerplate_pack_unpack_binary_ops(bin_ops, dst, src1, src2):
 
     with Driver() as drv:
 
-        cases = itertools.product(bin_ops, dst_ops, src1_ops, src2_ops)
+        cases = list(itertools.product(bin_ops, dst_ops, src1_ops, src2_ops))
 
         code = drv.program(lambda asm: qpu_pack_unpack_binary_ops(asm, bin_ops, dst_ops, src1_ops, src2_ops))
         X1 = drv.alloc((48-src1_bits, ), dtype = 'float{}'.format(src1_bits))
         X2 = drv.alloc((48-src2_bits, ), dtype = 'float{}'.format(src2_bits))
-        Y = drv.alloc((len(list(cases)), 48-dst_bits), dtype = 'float{}'.format(dst_bits))
+        Y = drv.alloc((len(cases), 48-dst_bits), dtype = 'float{}'.format(dst_bits))
         unif = drv.alloc(3, dtype = 'uint32')
 
         X1[:] = np.random.randn(*X1.shape).astype('float32')
@@ -173,7 +113,7 @@ def qpu_pack_unpack_unary_ops(asm, bin_ops, dst_ops, src_ops):
     mov(tmua, rf0, sig = 'thrsw').add(rf0, rf0, r3)
     nop(null)
     nop(null)
-    nop(r2, sig = 'ldtmu')
+    nop(r1, sig = 'ldtmu')
 
     g = globals()
     for op, pack, unpack in itertools.product(bin_ops, dst_ops, src_ops):
@@ -208,11 +148,11 @@ def boilerplate_pack_unpack_unary_ops(uni_ops, dst, src):
 
     with Driver() as drv:
 
-        cases = itertools.product(uni_ops, dst_ops, src_ops)
+        cases = list(itertools.product(uni_ops, dst_ops, src_ops))
 
         code = drv.program(lambda asm: qpu_pack_unpack_unary_ops(asm, uni_ops, dst_ops, src_ops))
         X = drv.alloc((48-src_bits, ), dtype = 'float{}'.format(src_bits))
-        Y = drv.alloc((len(list(cases)), 48-dst_bits), dtype = 'float{}'.format(dst_bits))
+        Y = drv.alloc((len(cases), 48-dst_bits), dtype = 'float{}'.format(dst_bits))
         unif = drv.alloc(3, dtype = 'uint32')
 
         X[:] = np.random.randn(*X.shape).astype('float32')
@@ -226,8 +166,8 @@ def boilerplate_pack_unpack_unary_ops(uni_ops, dst, src):
         end = time.time()
 
         for ix, (uni_op, dst_op, src_op) in enumerate(cases):
-            msg = '{}({}, {}, {})'.format(uni_op, dst_op, src_op)
-            assert np.allclose(ops[dst_op](Y[ix]), ops[uni_op](ops[src1_op](X)), rtol=1e-2), msg
+            msg = '{}({}, {})'.format(uni_op, dst_op, src_op)
+            assert np.allclose(ops[dst_op](Y[ix]), ops[uni_op](ops[src_op](X)), rtol=1e-2), msg
 
 def test_pack_unpack_unary_ops():
     packs = [(32, ['none']), (16, ['l', 'h'])]
