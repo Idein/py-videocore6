@@ -64,15 +64,15 @@ def qpu_sgemm_rnn_naive(asm):
                 nop(r2, sig = 'ldtmu')
 
                 b(R.loop_k, cond = 'anyna')
-                nop(null).fmul21(r1, r1, r2)
+                fmul(r1, r1, r2)
                 fadd(r0, r0, r1).add(reg_A_k, reg_A_k, 4)
                 add(reg_B_k, reg_B_k, reg_4_R)
 
             mov(tmua, reg_C_j, sig = 'thrsw')
-            nop(null).fmul21(r0, r0, reg_alpha)
+            fmul(r0, r0, reg_alpha)
             sub(reg_j, reg_j, 1, cond = 'pushz')
             nop(r1, sig = 'ldtmu')
-            nop(null).fmul21(r1, r1, reg_beta)
+            fmul(r1, r1, reg_beta)
 
             b(R.loop_j, cond = 'anyna')
             fadd(tmud, r0, r1).add(reg_B_j, reg_B_j, reg_64)
