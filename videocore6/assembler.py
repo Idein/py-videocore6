@@ -152,6 +152,7 @@ class Instruction(object):
             # FADD is FADDNF depending on the order of the mux_a/mux_b.
             'fadd' : 0,
             'faddnf' : 0,
+            'vfpack' : 53,
             'add' : 56,
             'sub' : 60,
             'fsub' : 64,
@@ -166,6 +167,8 @@ class Instruction(object):
             # FMIN is FMAX depending on the order of the mux_a/mux_b.
             'fmin' : 128,
             'fmax' : 128,
+
+            'vfmin' : 176,
 
             'band' : 181,
             'bor' : 182,
@@ -201,6 +204,8 @@ class Instruction(object):
             'op_log' : 188,
             'op_sin' : 188,
             'op_rsqrt2' : 188,
+
+            'vfmax' : 240,
 
             # The stvpms are distinguished by the waddr field.
             'stvpmv' : 248,
@@ -273,6 +278,7 @@ class Instruction(object):
             'add' : 1,
             'sub' : 2,
             'umul24' : 3,
+            'vfmul' : 4,
             'smul24' : 9,
             'multop' : 10,
             'fmov' : 14,
@@ -592,6 +598,25 @@ class Instruction(object):
                 self.op |= a_unpack << 2
                 self.op |= b_unpack << 0
 
+            if opr in ['vfpack']:
+
+                a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else 0
+                b_unpack = src2.unpack_bits[0] if isinstance(src2, Register) else 0
+
+                self.op &= ~0b101
+                self.op |= a_unpack << 2
+                self.op |= b_unpack
+
+            if opr in ['vfmin', 'vfmax']:
+
+                a_unpack = src1.unpack_bits[1] if isinstance(src1, Register) else 0
+                self.op |= a_unpack
+
+            if opr in ['vfmul']:
+
+                a_unpack = src1.unpack_bits[1] if isinstance(src1, Register) else 0
+                self.op += a_unpack
+
             if opr in ['fmul']:
 
                 a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else 0
@@ -663,8 +688,12 @@ def fmul(asm, dst, src1, src2, **kwargs):
 def fmov(asm, dst, src, **kwargs):
     return Instruction(asm, 'nop', Instruction.REGISTERS['null']).fmov(dst, src, **kwargs)
 
+def vfmul(asm, dst, src1, src2, **kwargs):
+    return Instruction(asm, 'nop', Instruction.REGISTERS['null']).vfmul(dst, src1, src2, **kwargs)
+
 _alias_ops = [
     mov,
+    vfmul,
     fmul,
     fmov,
 ]
