@@ -276,11 +276,6 @@ class Instruction(object):
             'smul24' : 9,
             'multop' : 10,
             'fmov' : 14,
-
-            'fmov_0' : 15,
-            'fmov_1' : 15,
-            'fmov_2' : 15,
-            'fmov_3' : 15,
             'nop' : 15,
             'mov' : 15,
             'fmul' : 16,
@@ -291,12 +286,9 @@ class Instruction(object):
     }
 
     mul_op_mux_b = {
-            'fmov_0' : 0,
-            'fmov_1' : 1,
-            'fmov_2' : 2,
-            'fmov_3' : 3,
             'nop' : 4,
             'mov' : 7,
+            'fmov' : 0,
     }
 
     # Don't ask me why...
@@ -609,6 +601,13 @@ class Instruction(object):
                 self.op |= a_unpack << 2
                 self.op |= b_unpack << 0
 
+            if opr in ['fmov']:
+
+                a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else 0
+
+                self.op |= (dst.pack_bits >> 1) & 1
+                self.mux_b = ((dst.pack_bits & 1) << 2) | a_unpack
+
     class AddALU(ALU):
 
         def __init__(self, insn, *args, **kwargs):
@@ -661,9 +660,13 @@ def mov(asm, dst, src, **kwargs):
 def fmul(asm, dst, src1, src2, **kwargs):
     return Instruction(asm, 'nop', Instruction.REGISTERS['null']).fmul(dst, src1, src2, **kwargs)
 
+def fmov(asm, dst, src, **kwargs):
+    return Instruction(asm, 'nop', Instruction.REGISTERS['null']).fmov(dst, src, **kwargs)
+
 _alias_ops = [
     mov,
     fmul,
+    fmov,
 ]
 
 def qpu(func):
