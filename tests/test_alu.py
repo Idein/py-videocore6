@@ -5,6 +5,17 @@ from videocore6.assembler import qpu
 import numpy as np
 import itertools
 
+def rotate_right(n, s):
+    return ((n << (32-s)) | (n >> s)) & 0xffffffff
+
+def count_leading_zeros(n):
+    bit = 0x80000000
+    count = 0
+    while bit != n & bit:
+        count += 1
+        bit >>= 1
+    return count
+
 ops = {
     # binary ops
     'fadd' : lambda a,b: a + b,
@@ -19,6 +30,22 @@ ops = {
     'vfmax' : np.maximum,
     'vfmul' : lambda a,b: a * b,
 
+    'add' : lambda a,b: a + b,
+    'sub' : lambda a,b: a - b,
+    'imin' : np.minimum,
+    'imax' : np.maximum,
+    'umin' : np.minimum,
+    'umax' : np.maximum,
+
+    'shl' : lambda a,b: a << b,
+    'shr' : lambda a,b: a >> b,
+    'asr' : lambda a,b: a.astype('int32') >> b,
+    'ror' : np.vectorize(rotate_right),
+
+    'band' : lambda a,b: a & b,
+    'bor' : lambda a,b: a | b,
+    'bxor' : lambda a,b: a ^ b,
+
     # unary ops
     'fmov' : lambda x: x,
     'fround' : np.round,
@@ -30,6 +57,13 @@ ops = {
     'ftoin': lambda x: x.round().astype('int32'),
     'ftoiz': lambda x: np.trunc(x).astype('int32'),
     'ftouz': lambda x: np.trunc(x).astype('uint32'),
+
+    'bnot' : lambda x: ~x,
+    'neg' : lambda x: -x,
+
+    'itof' : lambda x: x.astype('float32'),
+    'clz' : np.vectorize(count_leading_zeros),
+    'utof' : lambda x: x.astype('float32'),
 
     # pack/unpack flags
     'l' : lambda x: x[0::2],
@@ -100,8 +134,8 @@ def boilerplate_binary_ops(bin_ops, dst, src1, src2):
         Y = drv.alloc((len(cases), 16*4//np.dtype(dst_dtype).itemsize), dtype = dst_dtype)
         unif = drv.alloc(3, dtype = 'uint32')
 
-        X1[:] = np.random.randn(*X1.shape).astype('float32')
-        X2[:] = np.random.randn(*X2.shape).astype('float32')
+        X1[:] = np.random.randn(*X1.shape).astype(src1_dtype)
+        X2[:] = np.random.randn(*X2.shape).astype(src2_dtype)
         Y[:] = 0.0
 
         unif[0] = X1.addresses()[0]
@@ -141,6 +175,23 @@ def test_binary_ops():
             ['vfmin', 'vfmax', 'vfmul'],
             dst, src1, src2,
         )
+
+    boilerplate_binary_ops(
+        ['add', 'sub', 'imin', 'imax'],
+        ('int32', [None]), ('int32', [None]), ('int32', [None]),
+    )
+    boilerplate_binary_ops(
+        ['add', 'sub', 'umin', 'umax'],
+        ('uint32', [None]), ('uint32', [None]), ('uint32', [None]),
+    )
+    boilerplate_binary_ops(
+        ['shl', 'shr', 'asr', 'ror'],
+        ('uint32', [None]), ('uint32', [None]), ('uint32', [None]),
+    )
+    boilerplate_binary_ops(
+        ['band', 'bor', 'bxor'],
+        ('uint32', [None]), ('uint32', [None]), ('uint32', [None]),
+    )
 
 @qpu
 def qpu_unary_ops(asm, bin_ops, dst_ops, src_ops):
@@ -191,8 +242,7 @@ def boilerplate_unary_ops(uni_ops, dst, src):
         Y = drv.alloc((len(cases), 16*4//np.dtype(dst_dtype).itemsize), dtype = dst_dtype)
         unif = drv.alloc(3, dtype = 'uint32')
 
-        X[:] = np.random.randn(*X.shape).astype('float32') / 32
-        X[:] = np.arange(*X.shape).astype('float32') / 16
+        X[:] = np.random.randn(*X.shape).astype(src_dtype)
         Y[:] = 0.0
 
         unif[0] = X.addresses()[0]
@@ -246,3 +296,19 @@ def test_unary_ops():
     #         ['ftoc'],
     #         dst, src,
     #     )
+    boilerplate_unary_ops(
+        ['bnot', 'neg'],
+        ('int32', [None]), ('int32', [None]),
+    )
+    boilerplate_unary_ops(
+        ['itof'],
+        ('float32', [None]), ('int32', [None]),
+    )
+    boilerplate_unary_ops(
+        ['clz'],
+        ('uint32', [None]), ('uint32', [None]),
+    )
+    boilerplate_unary_ops(
+        ['utof'],
+        ('float32', [None]), ('uint32', [None]),
+    )
