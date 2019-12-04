@@ -205,7 +205,20 @@ class Instruction(object):
             'op_sin' : 188,
             'op_rsqrt2' : 188,
 
+            'fcmp' : 192,
+
             'vfmax' : 240,
+
+            'fround' : 245,
+            'ftoin' : 245,
+            'ftrunc' : 245,
+            'ftoiz' : 245,
+            'ffloor' : 246,
+            'ftouz' : 246,
+            'fceil' : 246,
+            'ftoc' : 246,
+            'fdx' : 247,
+            'fdy' : 247,
 
             # The stvpms are distinguished by the waddr field.
             'stvpmv' : 248,
@@ -254,6 +267,17 @@ class Instruction(object):
             'vflna' : 0,
             'vflb' : 0,
             'vflnb' : 0,
+
+            'fround' : 0,
+            'ftoin' : 3,
+            'ftrunc' : 4,
+            'ftoiz' : 7,
+            'ffloor' : 0,
+            'ftouz' : 3,
+            'fceil' : 4,
+            'ftoc' : 7,
+            'fdx' : 0,
+            'fdy' : 4,
 
             'msf' : 2,
             'revf' : 2,
@@ -583,12 +607,12 @@ class Instruction(object):
                 self.mux_b = self.manage_src(insn, src2)
 
 
-            if opr in ['fadd', 'faddnf', 'fsub', 'fmax', 'fmin']:
+            if opr in ['fadd', 'faddnf', 'fsub', 'fmax', 'fmin', 'fcmp']:
 
                 self.op |= dst.pack_bits << 4
 
-                a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else 0
-                b_unpack = src2.unpack_bits[0] if isinstance(src2, Register) else 0
+                a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else Register.INPUT_MODIFIER['none'][0]
+                b_unpack = src2.unpack_bits[0] if isinstance(src2, Register) else Register.INPUT_MODIFIER['none'][0]
 
                 ordering = a_unpack * 8 + self.mux_a > b_unpack * 8 + self.mux_b
                 if (opr in ['fmin', 'fadd'] and ordering) or (opr in ['fmax', 'faddnf'] and not ordering):
@@ -598,10 +622,27 @@ class Instruction(object):
                 self.op |= a_unpack << 2
                 self.op |= b_unpack << 0
 
+            if opr in ['fround', 'ftrunc', 'ffloor', 'fceil', 'fdx', 'fdy']:
+
+                assert src1.unpack_bits != Register.INPUT_MODIFIER['abs'], "'abs' unpacking is not allowed here."
+
+                self.mux_b |= dst.pack_bits
+                a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else Register.INPUT_MODIFIER['none'][0]
+                self.op = (self.op & ~(1 << 2)) | a_unpack << 2
+
+            if opr in ['ftoin', 'ftoiz', 'ftouz', 'ftoc']:
+
+                assert dst.pack_bits == Register.OUTPUT_MODIFIER['none'], "packing is not allowed here."
+                assert src1.unpack_bits != Register.INPUT_MODIFIER['abs'], "'abs' unpacking is not allowed here."
+
+                a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else Register.INPUT_MODIFIER['none'][0]
+                self.op &= ~0b1100
+                self.op |= a_unpack << 2
+
             if opr in ['vfpack']:
 
-                a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else 0
-                b_unpack = src2.unpack_bits[0] if isinstance(src2, Register) else 0
+                a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else Register.INPUT_MODIFIER['none'][0]
+                b_unpack = src2.unpack_bits[0] if isinstance(src2, Register) else Register.INPUT_MODIFIER['none'][0]
 
                 self.op &= ~0b101
                 self.op |= a_unpack << 2
@@ -609,18 +650,18 @@ class Instruction(object):
 
             if opr in ['vfmin', 'vfmax']:
 
-                a_unpack = src1.unpack_bits[1] if isinstance(src1, Register) else 0
+                a_unpack = src1.unpack_bits[1] if isinstance(src1, Register) else Register.INPUT_MODIFIER['none'][1]
                 self.op |= a_unpack
 
             if opr in ['vfmul']:
 
-                a_unpack = src1.unpack_bits[1] if isinstance(src1, Register) else 0
+                a_unpack = src1.unpack_bits[1] if isinstance(src1, Register) else Register.INPUT_MODIFIER['none'][1]
                 self.op += a_unpack
 
             if opr in ['fmul']:
 
-                a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else 0
-                b_unpack = src2.unpack_bits[0] if isinstance(src2, Register) else 0
+                a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else Register.INPUT_MODIFIER['none'][0]
+                b_unpack = src2.unpack_bits[0] if isinstance(src2, Register) else Register.INPUT_MODIFIER['none'][0]
 
                 self.op += dst.pack_bits << 4
                 self.op |= a_unpack << 2
