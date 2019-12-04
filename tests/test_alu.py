@@ -28,7 +28,11 @@ def qpu_pack_unpack_binary_ops(asm, bin_ops, dst_ops, src1_ops, src2_ops):
 
     g = globals()
     for op, pack, unpack1, unpack2 in itertools.product(bin_ops, dst_ops, src1_ops, src2_ops):
-        g[op](r0.pack(pack), r1.unpack(unpack1), r2.unpack(unpack2))
+        g[op](
+            r0.pack(pack) if pack is not None else r0,
+            r1.unpack(unpack1) if unpack1 is not None else r1,
+            r2.unpack(unpack2) if unpack2 is not None else r2
+        )
         mov(tmud, r0)
         mov(tmua, rf2)
         tmuwt(null).add(rf2, rf2, r3)
@@ -64,6 +68,7 @@ def boilerplate_pack_unpack_binary_ops(bin_ops, dst, src1, src2):
         # pack/unpack flags
         'l' : lambda x: x[0::2],
         'h' : lambda x: x[1::2],
+        None : lambda x: x,
         'none' : lambda x: x,
         'abs' : np.abs,
         'r32' : lambda x: x.repeat(2),
@@ -102,21 +107,21 @@ def boilerplate_pack_unpack_binary_ops(bin_ops, dst, src1, src2):
                 assert np.all(ops[dst_op](Y[ix]) == ops[bin_op](ops[src1_op](X1), ops[src2_op](X2))), msg
 
 def test_pack_unpack_binary_ops():
-    packs = [('float32', ['none']), ('float16', ['l', 'h'])]
-    unpacks = [('float32', ['none', 'abs']), ('float16', ['l', 'h'])]
+    packs = [('float32', [None, 'none']), ('float16', ['l', 'h'])]
+    unpacks = [('float32', [None, 'none', 'abs']), ('float16', ['l', 'h'])]
     for dst, src1, src2 in itertools.product(packs, unpacks, unpacks):
         boilerplate_pack_unpack_binary_ops(
             ['fadd', 'faddnf', 'fsub', 'fmin', 'fmax', 'fmul', 'fcmp'],
             dst, src1, src2,
         )
-    packs = [('float16', ['none'])]
-    unpacks = [('float32', ['none']), ('float16', ['l', 'h'])]
+    packs = [('float16', [None, 'none'])]
+    unpacks = [('float32', [None, 'none']), ('float16', ['l', 'h'])]
     for dst, src1, src2 in itertools.product(packs, unpacks, unpacks):
         boilerplate_pack_unpack_binary_ops(
             ['vfpack'],
             dst, src1, src2,
         )
-    packs = [('float16', ['none'])]
+    packs = [('float16', [None, 'none'])]
     unpacks = [('float32', ['r32']), ('float16', ['rl2h', 'rh2l', 'swap'])]
     for dst, src1, src2 in itertools.product(packs, unpacks, packs):
         boilerplate_pack_unpack_binary_ops(
@@ -142,7 +147,10 @@ def qpu_pack_unpack_unary_ops(asm, bin_ops, dst_ops, src_ops):
 
     g = globals()
     for op, pack, unpack in itertools.product(bin_ops, dst_ops, src_ops):
-        g[op](r0.pack(pack), r1.unpack(unpack))
+        g[op](
+            r0.pack(pack) if pack is not None else r0,
+            r1.unpack(unpack) if unpack is not None else r1,
+        )
         mov(tmud, r0)
         mov(tmua, rf1)
         tmuwt(null).add(rf1, rf1, r3)
@@ -177,6 +185,7 @@ def boilerplate_pack_unpack_unary_ops(uni_ops, dst, src):
         # pack/unpack flags
         'l' : lambda x: x[0::2],
         'h' : lambda x: x[1::2],
+        None : lambda x: x,
         'none' : lambda x: x,
         'abs' : np.abs,
     }
@@ -209,29 +218,29 @@ def boilerplate_pack_unpack_unary_ops(uni_ops, dst, src):
                 assert np.all(ops[dst_op](Y[ix]) == ops[uni_op](ops[src_op](X))), msg
 
 def test_pack_unpack_unary_ops():
-    packs = [('float32', ['none']), ('float16', ['l', 'h'])]
-    unpacks = [('float32', ['none', 'abs']), ('float16', ['l', 'h'])]
+    packs = [('float32', [None, 'none']), ('float16', ['l', 'h'])]
+    unpacks = [('float32', [None, 'none', 'abs']), ('float16', ['l', 'h'])]
     for dst, src in itertools.product(packs, unpacks):
         boilerplate_pack_unpack_unary_ops(
             ['fmov'],
             dst, src,
         )
-    packs = [('float32', ['none']), ('float16', ['l', 'h'])]
-    unpacks = [('float32', ['none']), ('float16', ['l', 'h'])]
+    packs = [('float32', [None, 'none']), ('float16', ['l', 'h'])]
+    unpacks = [('float32', [None, 'none']), ('float16', ['l', 'h'])]
     for dst, src in itertools.product(packs, unpacks):
         boilerplate_pack_unpack_unary_ops(
             ['fround', 'ftrunc', 'ffloor', 'fceil', 'fdx', 'fdy'],
             dst, src,
         )
-    packs = [('int32', ['none'])]
-    unpacks = [('float32', ['none']), ('float16', ['l', 'h'])]
+    packs = [('int32', [None, 'none'])]
+    unpacks = [('float32', [None, 'none']), ('float16', ['l', 'h'])]
     for dst, src in itertools.product(packs, unpacks):
         boilerplate_pack_unpack_unary_ops(
             ['ftoin', 'ftoiz'],
             dst, src,
         )
-    packs = [('uint32', ['none'])]
-    unpacks = [('float32', ['none']), ('float16', ['l', 'h'])]
+    packs = [('uint32', [None, 'none'])]
+    unpacks = [('float32', [None, 'none']), ('float16', ['l', 'h'])]
     for dst, src in itertools.product(packs, unpacks):
         boilerplate_pack_unpack_unary_ops(
             ['ftouz'],
