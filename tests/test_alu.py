@@ -44,9 +44,9 @@ def qpu_pack_unpack_binary_ops(asm, bin_ops, dst_ops, src1_ops, src2_ops):
 
 def boilerplate_pack_unpack_binary_ops(bin_ops, dst, src1, src2):
 
-    dst_bits, dst_ops = dst
-    src1_bits, src1_ops = src1
-    src2_bits, src2_ops = src2
+    dst_dtype, dst_ops = dst
+    src1_dtype, src1_ops = src1
+    src2_dtype, src2_ops = src2
 
     ops = {
         # op
@@ -56,6 +56,7 @@ def boilerplate_pack_unpack_binary_ops(bin_ops, dst, src1, src2):
         'fmin' : np.minimum,
         'fmax' : np.maximum,
         'fmul' : lambda a,b: a * b,
+        'fcmp' : lambda a,b: a - b,
         'vfpack' : lambda a,b: np.stack([a,b]).T.ravel(),
         'vfmin' : np.minimum,
         'vfmax' : np.maximum,
@@ -65,10 +66,10 @@ def boilerplate_pack_unpack_binary_ops(bin_ops, dst, src1, src2):
         'h' : lambda x: x[1::2],
         'none' : lambda x: x,
         'abs' : np.abs,
-        'r32' : lambda x: np.stack([x,x]).T.ravel(),
-        'rl2h' : lambda x: np.stack([x[0::2],x[0::2]]).T.ravel(),
-        'rh2l' : lambda x: np.stack([x[1::2],x[1::2]]).T.ravel(),
-        'swap' : lambda x: np.stack([x[1::2],x[0::2]]).T.ravel(),
+        'r32' : lambda x: x.repeat(2),
+        'rl2h' : lambda x: x[0::2].repeat(2),
+        'rh2l' : lambda x: x[1::2].repeat(2),
+        'swap' : lambda x: x.reshape(-1,2)[:,::-1].ravel(),
     }
 
     with Driver() as drv:
@@ -76,9 +77,9 @@ def boilerplate_pack_unpack_binary_ops(bin_ops, dst, src1, src2):
         cases = list(itertools.product(bin_ops, dst_ops, src1_ops, src2_ops))
 
         code = drv.program(lambda asm: qpu_pack_unpack_binary_ops(asm, bin_ops, dst_ops, src1_ops, src2_ops))
-        X1 = drv.alloc((48-src1_bits, ), dtype = 'float{}'.format(src1_bits))
-        X2 = drv.alloc((48-src2_bits, ), dtype = 'float{}'.format(src2_bits))
-        Y = drv.alloc((len(cases), 48-dst_bits), dtype = 'float{}'.format(dst_bits))
+        X1 = drv.alloc((16*4//np.dtype(src1_dtype).itemsize, ), dtype = src1_dtype)
+        X2 = drv.alloc((16*4//np.dtype(src2_dtype).itemsize, ), dtype = src2_dtype)
+        Y = drv.alloc((len(cases), 16*4//np.dtype(dst_dtype).itemsize), dtype = dst_dtype)
         unif = drv.alloc(3, dtype = 'uint32')
 
         X1[:] = np.random.randn(*X1.shape).astype('float32')
@@ -95,25 +96,28 @@ def boilerplate_pack_unpack_binary_ops(bin_ops, dst, src1, src2):
 
         for ix, (bin_op, dst_op, src1_op, src2_op) in enumerate(cases):
             msg = '{}({}, {}, {})'.format(bin_op, dst_op, src1_op, src2_op)
-            assert np.allclose(ops[dst_op](Y[ix]), ops[bin_op](ops[src1_op](X1), ops[src2_op](X2)), rtol=1e-2), msg
+            if np.dtype(dst_dtype).name.startswith('float'):
+                assert np.allclose(ops[dst_op](Y[ix]), ops[bin_op](ops[src1_op](X1), ops[src2_op](X2)), rtol=1e-2), msg
+            elif np.dtype(dst_dtype).name.startswith('int') or np.dtype(dst_dtype).name.startswith('uint'):
+                assert np.all(ops[dst_op](Y[ix]) == ops[bin_op](ops[src1_op](X1), ops[src2_op](X2))), msg
 
 def test_pack_unpack_binary_ops():
-    packs = [(32, ['none']), (16, ['l', 'h'])]
-    unpacks = [(32, ['none', 'abs']), (16, ['l', 'h'])]
+    packs = [('float32', ['none']), ('float16', ['l', 'h'])]
+    unpacks = [('float32', ['none', 'abs']), ('float16', ['l', 'h'])]
     for dst, src1, src2 in itertools.product(packs, unpacks, unpacks):
         boilerplate_pack_unpack_binary_ops(
-            ['fadd', 'faddnf', 'fsub', 'fmin', 'fmax', 'fmul'],
+            ['fadd', 'faddnf', 'fsub', 'fmin', 'fmax', 'fmul', 'fcmp'],
             dst, src1, src2,
         )
-    packs = [(16, ['none'])]
-    unpacks = [(32, ['none']), (16, ['l', 'h'])]
+    packs = [('float16', ['none'])]
+    unpacks = [('float32', ['none']), ('float16', ['l', 'h'])]
     for dst, src1, src2 in itertools.product(packs, unpacks, unpacks):
         boilerplate_pack_unpack_binary_ops(
             ['vfpack'],
             dst, src1, src2,
         )
-    packs = [(16, ['none'])]
-    unpacks = [(32, ['r32']), (16, ['rl2h', 'rh2l', 'swap'])]
+    packs = [('float16', ['none'])]
+    unpacks = [('float32', ['r32']), ('float16', ['rl2h', 'rh2l', 'swap'])]
     for dst, src1, src2 in itertools.product(packs, unpacks, packs):
         boilerplate_pack_unpack_binary_ops(
             ['vfmin', 'vfmax', 'vfmul'],
@@ -154,12 +158,22 @@ def qpu_pack_unpack_unary_ops(asm, bin_ops, dst_ops, src_ops):
 
 def boilerplate_pack_unpack_unary_ops(uni_ops, dst, src):
 
-    dst_bits, dst_ops = dst
-    src_bits, src_ops = src
+    dst_dtype, dst_ops = dst
+    src_dtype, src_ops = src
 
     ops = {
         # op
         'fmov' : lambda x: x,
+        'fround' : np.round,
+        'ftrunc' : np.trunc,
+        'ffloor' : np.floor,
+        'fceil' : np.ceil,
+        'fdx' : lambda x: (x[1::2] - x[0::2]).repeat(2),
+        'fdy' : lambda x: (lambda a: (a[1::2] - a[0::2]).ravel())(x.reshape(-1,2).repeat(2,axis=0).reshape(-1,4)),
+        'ftoin': lambda x: x.round().astype('int32'),
+        'ftoiz': lambda x: np.trunc(x).astype('int32'),
+        'ftouz': lambda x: np.trunc(x).astype('uint32'),
+        # TODO: 'ftoc': what is the meaning of this instruction ?
         # pack/unpack flags
         'l' : lambda x: x[0::2],
         'h' : lambda x: x[1::2],
@@ -172,11 +186,12 @@ def boilerplate_pack_unpack_unary_ops(uni_ops, dst, src):
         cases = list(itertools.product(uni_ops, dst_ops, src_ops))
 
         code = drv.program(lambda asm: qpu_pack_unpack_unary_ops(asm, uni_ops, dst_ops, src_ops))
-        X = drv.alloc((48-src_bits, ), dtype = 'float{}'.format(src_bits))
-        Y = drv.alloc((len(cases), 48-dst_bits), dtype = 'float{}'.format(dst_bits))
+        X = drv.alloc((16*4//np.dtype(src_dtype).itemsize, ), dtype = src_dtype)
+        Y = drv.alloc((len(cases), 16*4//np.dtype(dst_dtype).itemsize), dtype = dst_dtype)
         unif = drv.alloc(3, dtype = 'uint32')
 
-        X[:] = np.random.randn(*X.shape).astype('float32')
+        X[:] = np.random.randn(*X.shape).astype('float32') / 32
+        X[:] = np.arange(*X.shape).astype('float32') / 16
         Y[:] = 0.0
 
         unif[0] = X.addresses()[0]
@@ -188,13 +203,45 @@ def boilerplate_pack_unpack_unary_ops(uni_ops, dst, src):
 
         for ix, (uni_op, dst_op, src_op) in enumerate(cases):
             msg = '{}({}, {})'.format(uni_op, dst_op, src_op)
-            assert np.allclose(ops[dst_op](Y[ix]), ops[uni_op](ops[src_op](X)), rtol=1e-2), msg
+            if np.dtype(dst_dtype).name.startswith('float'):
+                assert np.allclose(ops[dst_op](Y[ix]), ops[uni_op](ops[src_op](X)), rtol=1e-2), msg
+            elif np.dtype(dst_dtype).name.startswith('int') or np.dtype(dst_dtype).name.startswith('uint'):
+                assert np.all(ops[dst_op](Y[ix]) == ops[uni_op](ops[src_op](X))), msg
 
 def test_pack_unpack_unary_ops():
-    packs = [(32, ['none']), (16, ['l', 'h'])]
-    unpacks = [(32, ['none', 'abs']), (16, ['l', 'h'])]
+    packs = [('float32', ['none']), ('float16', ['l', 'h'])]
+    unpacks = [('float32', ['none', 'abs']), ('float16', ['l', 'h'])]
     for dst, src in itertools.product(packs, unpacks):
         boilerplate_pack_unpack_unary_ops(
             ['fmov'],
             dst, src,
         )
+    packs = [('float32', ['none']), ('float16', ['l', 'h'])]
+    unpacks = [('float32', ['none']), ('float16', ['l', 'h'])]
+    for dst, src in itertools.product(packs, unpacks):
+        boilerplate_pack_unpack_unary_ops(
+            ['fround', 'ftrunc', 'ffloor', 'fceil', 'fdx', 'fdy'],
+            dst, src,
+        )
+    packs = [('int32', ['none'])]
+    unpacks = [('float32', ['none']), ('float16', ['l', 'h'])]
+    for dst, src in itertools.product(packs, unpacks):
+        boilerplate_pack_unpack_unary_ops(
+            ['ftoin', 'ftoiz'],
+            dst, src,
+        )
+    packs = [('uint32', ['none'])]
+    unpacks = [('float32', ['none']), ('float16', ['l', 'h'])]
+    for dst, src in itertools.product(packs, unpacks):
+        boilerplate_pack_unpack_unary_ops(
+            ['ftouz'],
+            dst, src,
+        )
+    # TODO: 'ftoc': what is the meaning of this instruction ?
+    # packs = [('int32', ['none'])]
+    # unpacks = [('float32', ['none']), ('float16', ['l', 'h'])]
+    # for dst, src in itertools.product(packs, unpacks):
+    #     boilerplate_pack_unpack_unary_ops(
+    #         ['ftoc'],
+    #         dst, src,
+    #     )
