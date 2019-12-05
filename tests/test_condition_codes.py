@@ -416,3 +416,146 @@ def test_cond_vflx():
 
         for ix, op in enumerate(ops):
             assert (data[ix] == expected(op)).all()
+
+
+# vflx instructions read a condition flag as int16
+@qpu
+def qpu_cond_vflx(asm, ops):
+
+    eidx(r0, sig = 'ldunif')
+    mov(r2, r5)
+    shl(r0, r0, 2)
+    add(r2, r2, r0)
+    shl(r1, 4, 4)
+
+    # init fla/flb
+    bxor(rf0, rf0, rf0).sub(rf1, rf1, rf1)
+    eidx(r0)
+    band(null, r0, 1 << 0, cond = 'pushz') # a = [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0]
+    band(null, r0, 1 << 1, cond = 'pushz') # a = [1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0], b = [0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1]
+
+    # flapush
+    g = globals()
+    for op in ops:
+        g[op](r0)
+        mov(tmud, r0)
+        mov(tmua, r2)
+        tmuwt(null).add(r2, r2, r1)
+
+    nop(null, sig = 'thrsw')
+    nop(null, sig = 'thrsw')
+    nop(null)
+    nop(null)
+    nop(null, sig = 'thrsw')
+    nop(null)
+    nop(null)
+    nop(null)
+
+def test_cond_vflx():
+
+    def expected(op):
+        result = [
+            np.array([1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0], dtype = 'int16'),
+            np.array([1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0], dtype = 'int16'),
+        ][op[-1] == 'b'].repeat(2)
+        if op[3:-1] == 'n':
+            result = 1 - result
+        return result
+
+    ops = [
+        'vfla',
+        'vflna',
+        'vflb',
+        'vflnb',
+    ]
+
+    with Driver() as drv:
+
+        code = drv.program(lambda asm: qpu_cond_vflx(asm, ops))
+        data = drv.alloc((len(ops), 32), dtype = 'int16')
+        unif = drv.alloc(1, dtype = 'uint32')
+
+        data[:] = 0
+
+        unif[0] = data.addresses()[0,0]
+
+        start = time.time()
+        drv.execute(code, unif.addresses()[0])
+        end = time.time()
+
+        for ix, op in enumerate(ops):
+            assert (data[ix] == expected(op)).all()
+
+
+@qpu
+def qpu_cond_flx(asm, ops):
+
+    eidx(r0, sig = 'ldunif')
+    mov(rf0, r5, sig = 'ldunif') # in
+    mov(rf1, r5, sig = 'ldunif')  # out
+    shl(r3, 4, 4).mov(rf2, r5)
+
+    shl(r0, r0, 2)
+    add(rf0, rf0, r0)
+    add(rf1, rf1, r0)
+    add(rf2, rf2, r0)
+
+    mov(tmua, rf0, sig = 'thrsw').add(rf0, rf0, r3)
+    nop(null)
+    mov(tmua, rf1, sig = 'thrsw').add(rf1, rf1, r3)
+    nop(r1, sig = 'ldtmu')
+    nop(null)
+    nop(r2, sig = 'ldtmu')
+
+    # init fla/flb
+    mov(null, r2, cond = 'pushn')
+    band(null, r2, 1, cond = 'pushz') # fla, flb = ~(r2 & 1), r2 < 0
+
+    g = globals()
+    for op in ops:
+        g[op](tmud, r1)
+        mov(tmua, rf2)
+        tmuwt(null).add(rf2, rf2, r3)
+
+    nop(null, sig = 'thrsw')
+    nop(null, sig = 'thrsw')
+    nop(null)
+    nop(null)
+    nop(null, sig = 'thrsw')
+    nop(null)
+    nop(null)
+    nop(null)
+
+def test_cond_flx():
+
+    ops = [
+        'flapush',
+        'flbpush',
+        'flpop',
+    ]
+
+    with Driver() as drv:
+
+        code = drv.program(lambda asm: qpu_cond_flx(asm, ops))
+        X1 = drv.alloc((16,), dtype = 'uint32')
+        X2 = drv.alloc((16,), dtype = 'int32')
+        Y = drv.alloc((len(ops), 16), dtype = 'uint32')
+        unif = drv.alloc(3, dtype = 'uint32')
+
+        X1[:] = (np.random.randn(*X1.shape) * (2**24)).astype('uint32')
+        X2[:] = np.random.randn(*X2.shape).astype('int32')
+        Y[:] = 0.0
+
+        unif[0] = X1.addresses()[0]
+        unif[1] = X2.addresses()[0]
+        unif[2] = Y.addresses()[0,0]
+
+        start = time.time()
+        drv.execute(code, unif.addresses()[0])
+        end = time.time()
+
+        fla = 1 - X2 & 1
+        flb = X2 < 0
+
+        for ix, op in enumerate(ops):
+            assert (Y[ix] == [(X1 << 2) | (3 * [fla,flb][op[2] == 'b']), X1 >> 2][op[2:] == 'pop']).all()
