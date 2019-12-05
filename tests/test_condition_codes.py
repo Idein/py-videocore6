@@ -160,7 +160,7 @@ def test_cond_push_b():
 
 # `cond = '{and,nor}*'` updates the conditional flag A and it don't affect to B
 @qpu
-def qpu_cond_update(asm):
+def qpu_cond_update(asm, cond_update_flags):
 
     eidx(r0, sig = 'ldunif')
     mov(r2, r5)
@@ -168,26 +168,11 @@ def qpu_cond_update(asm):
     add(r2, r2, r0)
     shl(r1, 4, 4)
 
-    cond_update_flags = [
-        'andz',
-        'andnz',
-        'nornz',
-        'norz',
-        'andn',
-        'andnn',
-        'nornn',
-        'norn',
-        'andc',
-        'andnc',
-        'nornc',
-        'norc',
-    ]
-
     for cond_update_flag in cond_update_flags:
         eidx(r0)
-        band(r0, r0, 1, cond = 'pushz')
+        band(r0, r0, 1, cond = 'pushz') # fla = [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0]
         eidx(r0)
-        sub(r0, r0, 5, cond = cond_update_flag)
+        sub(null, r0, 5, cond = cond_update_flag)
         mov(r0, 0)
         mov(r0, 1, cond = 'ifa')
         mov(tmud, r0)
@@ -216,9 +201,33 @@ def qpu_cond_update(asm):
 
 def test_cond_update():
 
+    cond_update_flags = [
+        'andz',
+        'andnz',
+        'nornz',
+        'norz',
+        'andn',
+        'andnn',
+        'nornn',
+        'norn',
+        'andc',
+        'andnc',
+        'nornc',
+        'norc',
+    ]
+
+    def cond_update_op(cond_update_flag):
+        bin_op = [
+            lambda a,b: np.logical_not(np.logical_or(a, b)),
+            np.logical_and
+        ][cond_update_flag[:3] == 'and']
+        b_op = lambda b: [b < 0, b == 0][cond_update_flag[-1] == 'z']
+        not_op = [lambda x: x, np.logical_not][cond_update_flag[3:-1] == 'n']
+        return lambda a,b: bin_op(a, not_op(b_op(b)))
+
     with Driver() as drv:
 
-        code = drv.program(qpu_cond_update)
+        code = drv.program(lambda asm: qpu_cond_update(asm, cond_update_flags))
         data = drv.alloc((24, 16), dtype = 'uint32')
         unif = drv.alloc(1, dtype = 'uint32')
 
@@ -230,24 +239,11 @@ def test_cond_update():
         drv.execute(code, unif.addresses()[0])
         end = time.time()
 
-        expected = np.array(
-            [[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-             [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0],
-             [0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0],
-             [0,1,0,1,0,0,0,1,0,1,0,1,0,1,0,1],
-             [1,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0],
-             [0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,0],
-             [0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-             [0,0,0,0,0,1,0,1,0,1,0,1,0,1,0,1],
-             [1,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0],
-             [0,0,0,0,0,0,1,0,1,0,1,0,1,0,1,0],
-             [0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0],
-             [0,0,0,0,0,1,0,1,0,1,0,1,0,1,0,1]],
-            dtype = 'uint32'
-        )
+        a = np.array([1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0]) > 0
+        b = np.arange(16) - 5
 
-        assert (data[:12] == expected).all()
-        assert (data[12:] == expected).all()
+        for ix, cond_update_flag in enumerate(cond_update_flags):
+            assert np.all(data[ix] == cond_update_op(cond_update_flag)(a, b))
 
 # dual `cond=''` instruction
 @qpu
