@@ -347,3 +347,72 @@ def test_cond_combination():
         )
 
         assert (data == expected).all()
+
+
+# vflx instructions read a condition flag as int16
+@qpu
+def qpu_cond_vflx(asm, ops):
+
+    eidx(r0, sig = 'ldunif')
+    mov(r2, r5)
+    shl(r0, r0, 2)
+    add(r2, r2, r0)
+    shl(r1, 4, 4)
+
+    # init fla/flb
+    bxor(rf0, rf0, rf0).sub(rf1, rf1, rf1)
+    eidx(r0)
+    band(null, r0, 1 << 0, cond = 'pushz') # a = [1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0]
+    band(null, r0, 1 << 1, cond = 'pushz') # a = [1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0], b = [0,1,0,1,0,1,0,1,0,1,0,1,0,1,0,1]
+
+    # flapush
+    g = globals()
+    for op in ops:
+        g[op](r0)
+        mov(tmud, r0)
+        mov(tmua, r2)
+        tmuwt(null).add(r2, r2, r1)
+
+    nop(null, sig = 'thrsw')
+    nop(null, sig = 'thrsw')
+    nop(null)
+    nop(null)
+    nop(null, sig = 'thrsw')
+    nop(null)
+    nop(null)
+    nop(null)
+
+def test_cond_vflx():
+
+    def expected(op):
+        result = [
+            np.array([1,1,0,0,1,1,0,0,1,1,0,0,1,1,0,0], dtype = 'int16'),
+            np.array([1,0,1,0,1,0,1,0,1,0,1,0,1,0,1,0], dtype = 'int16'),
+        ][op[-1] == 'b'].repeat(2)
+        if op[3:-1] == 'n':
+            result = 1 - result
+        return result
+
+    ops = [
+        'vfla',
+        'vflna',
+        'vflb',
+        'vflnb',
+    ]
+
+    with Driver() as drv:
+
+        code = drv.program(lambda asm: qpu_cond_vflx(asm, ops))
+        data = drv.alloc((len(ops), 32), dtype = 'int16')
+        unif = drv.alloc(1, dtype = 'uint32')
+
+        data[:] = 0
+
+        unif[0] = data.addresses()[0,0]
+
+        start = time.time()
+        drv.execute(code, unif.addresses()[0])
+        end = time.time()
+
+        for ix, op in enumerate(ops):
+            assert (data[ix] == expected(op)).all()
