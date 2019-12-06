@@ -26,10 +26,10 @@ class Array(np.ndarray):
     def addresses(self):
 
         return np.arange(
-                self.address,
-                self.address + self.nbytes,
-                self.itemsize,
-                np.uint32,
+            self.address,
+            self.address + self.nbytes,
+            self.itemsize,
+            np.uint32,
         ).reshape(self.shape)
 
 
@@ -39,18 +39,18 @@ class Memory(object):
 
         self.drm = drm
         self.size = size
-        self.handle  = None  # Handle of BO for V3D DRM
+        self.handle = None  # Handle of BO for V3D DRM
         self.phyaddr = None  # Physical address used in QPU
-        self.buffer  = None  # mmap object of the memory area
+        self.buffer = None  # mmap object of the memory area
 
         try:
 
             self.handle, self.phyaddr = drm.v3d_create_bo(size)
             offset = drm.v3d_mmap_bo(self.handle)
-            self.buffer = mmap.mmap(fileno = drm.fd, length = size,
-                    flags = mmap.MAP_SHARED,
-                    prot = mmap.PROT_READ | mmap.PROT_WRITE,
-                    offset = offset)
+            self.buffer = mmap.mmap(fileno=drm.fd, length=size,
+                                    flags=mmap.MAP_SHARED,
+                                    prot=mmap.PROT_READ | mmap.PROT_WRITE,
+                                    offset=offset)
 
         except Exception as e:
 
@@ -75,9 +75,9 @@ class Memory(object):
 class Driver(object):
 
     def __init__(self, *,
-            code_area_size = DEFAULT_CODE_AREA_SIZE,
-            data_area_size = DEFAULT_DATA_AREA_SIZE,
-    ):
+                 code_area_size=DEFAULT_CODE_AREA_SIZE,
+                 data_area_size=DEFAULT_DATA_AREA_SIZE,
+                 ):
 
         self.code_area_size = code_area_size
         self.data_area_size = data_area_size
@@ -97,7 +97,7 @@ class Driver(object):
 
             self.memory = Memory(self.drm, total_size)
 
-            self.bo_handles = np.array([self.memory.handle], dtype = np.uint32)
+            self.bo_handles = np.array([self.memory.handle], dtype=np.uint32)
 
         except Exception as e:
 
@@ -146,7 +146,7 @@ class Driver(object):
         prog(asm, *args, **kwargs)
         asm.finalize()
         for insn in asm:
-            print(f'{int(insn):#018x}', file = file)
+            print(f'{int(insn):#018x}', file=file)
 
     def program(self, prog, *args, **kwargs):
 
@@ -157,11 +157,11 @@ class Driver(object):
 
         offset = self.code_pos
         code = Array(
-                shape = len(asm),
-                dtype = np.uint64,
-                phyaddr = self.memory.phyaddr + offset,
-                buffer = self.memory.buffer,
-                offset = offset,
+            shape=len(asm),
+            dtype=np.uint64,
+            phyaddr=self.memory.phyaddr + offset,
+            buffer=self.memory.buffer,
+            offset=offset,
         )
 
         self.code_pos += code.nbytes
@@ -172,28 +172,28 @@ class Driver(object):
 
         return code
 
-    def execute(self, code, uniforms = None, timeout_sec = 10):
+    def execute(self, code, uniforms=None, timeout_sec=10):
 
         self.drm.v3d_submit_csd(
-                cfg = [
-                    # WGS X, Y, Z and settings
-                    0, 0, 0, 0,
-                    # Number of batches minus 1
-                    0,
-                    # Shader address, pnan, singleseg, threading
-                    code.addresses()[0],
-                    # Uniforms address
-                    uniforms if uniforms is not None else 0,
-                ],
-                # Not used in the driver.
-                coef = [0, 0, 0, 0],
-                bo_handles = self.bo_handles.ctypes.data,
-                bo_handle_count = len(self.bo_handles),
-                in_sync = 0,
-                out_sync = 0,
+            cfg=[
+                # WGS X, Y, Z and settings
+                0, 0, 0, 0,
+                # Number of batches minus 1
+                0,
+                # Shader address, pnan, singleseg, threading
+                code.addresses()[0],
+                # Uniforms address
+                uniforms if uniforms is not None else 0,
+            ],
+            # Not used in the driver.
+            coef=[0, 0, 0, 0],
+            bo_handles=self.bo_handles.ctypes.data,
+            bo_handle_count=len(self.bo_handles),
+            in_sync=0,
+            out_sync=0,
         )
 
         # XXX: Separate function
         for bo_handle in self.bo_handles:
             self.drm.v3d_wait_bo(bo_handle,
-                    timeout_ns = int(timeout_sec / 1e-9))
+                                 timeout_ns=int(timeout_sec / 1e-9))
