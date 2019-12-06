@@ -49,24 +49,24 @@ class Register(object):
 
     OUTPUT_MODIFIER = {
         # modifier: (f32, f16)
-        'none' : 0,
-        'l' : 1,
-        'h' : 2,
+        'none': 0,
+        'l': 1,
+        'h': 2,
     }
 
     INPUT_MODIFIER = {
         # modifier: (f32, f16)
-        'none' : (1, 0),
-        'abs' : (0, None),
-        'l' : (2, None),
-        'h' : (3, None),
-        'r32' : (None, 1),
-        'rl2h' : (None, 2),
-        'rh2l' : (None, 3),
-        'swap' : (None, 4),
+        'none': (1, 0),
+        'abs': (0, None),
+        'l': (2, None),
+        'h': (3, None),
+        'r32': (None, 1),
+        'rl2h': (None, 2),
+        'rh2l': (None, 3),
+        'swap': (None, 4),
     }
 
-    def __init__(self, name, magic, waddr, pack = 'none', unpack = 'none'):
+    def __init__(self, name, magic, waddr, pack='none', unpack='none'):
         self.name = name
         self.magic = magic
         self.waddr = waddr
@@ -75,11 +75,12 @@ class Register(object):
 
     def pack(self, modifier):
         assert self.pack_bits == Register.OUTPUT_MODIFIER['none']
-        return Register(self.name, self.magic, self.waddr, pack = modifier)
+        return Register(self.name, self.magic, self.waddr, pack=modifier)
 
     def unpack(self, modifier):
         assert self.unpack_bits == Register.INPUT_MODIFIER['none']
-        return Register(self.name, self.magic, self.waddr, unpack = modifier)
+        return Register(self.name, self.magic, self.waddr, unpack=modifier)
+
 
 class Instruction(object):
 
@@ -147,217 +148,216 @@ class Instruction(object):
     for i in range(64):
         REGISTERS[f'rf{i}'] = Register(f'rf{i}', 0, i)
 
-
     add_ops = {
-            # FADD is FADDNF depending on the order of the mux_a/mux_b.
-            'fadd' : 0,
-            'faddnf' : 0,
-            'vfpack' : 53,
-            'add' : 56,
-            'sub' : 60,
-            'fsub' : 64,
-            'imin' : 120,
-            'imax' : 121,
-            'umin' : 122,
-            'umax' : 123,
-            'shl' : 124,
-            'shr' : 125,
-            'asr' : 126,
-            'ror' : 127,
-            # FMIN is FMAX depending on the order of the mux_a/mux_b.
-            'fmin' : 128,
-            'fmax' : 128,
+        # FADD is FADDNF depending on the order of the mux_a/mux_b.
+        'fadd': 0,
+        'faddnf': 0,
+        'vfpack': 53,
+        'add': 56,
+        'sub': 60,
+        'fsub': 64,
+        'imin': 120,
+        'imax': 121,
+        'umin': 122,
+        'umax': 123,
+        'shl': 124,
+        'shr': 125,
+        'asr': 126,
+        'ror': 127,
+        # FMIN is FMAX depending on the order of the mux_a/mux_b.
+        'fmin': 128,
+        'fmax': 128,
 
-            'vfmin' : 176,
+        'vfmin': 176,
 
-            'band' : 181,
-            'bor' : 182,
-            'bxor' : 183,
+        'band': 181,
+        'bor': 182,
+        'bxor': 183,
 
-            'bnot' : 186,
-            'neg' : 186,
-            'flapush' : 186,
-            'flbpush' : 186,
-            'flpop' : 186,
-            'op_recip' : 186,
-            'setmsf' : 186,
-            'setrevf' : 186,
+        'bnot': 186,
+        'neg': 186,
+        'flapush': 186,
+        'flbpush': 186,
+        'flpop': 186,
+        'op_recip': 186,
+        'setmsf': 186,
+        'setrevf': 186,
 
-            'nop' : 187,
-            'tidx' : 187,
-            'eidx' : 187,
-            'lr' : 187,
-            'vfla' : 187,
-            'vflna' : 187,
-            'vflb' : 187,
-            'vflnb' : 187,
-            'msf' : 187,
-            'revf' : 187,
-            'iid' : 187,
-            'sampid' : 187,
-            'barrierid' : 187,
-            'tmuwt' : 187,
-            'vpmwt' : 187,
+        'nop': 187,
+        'tidx': 187,
+        'eidx': 187,
+        'lr': 187,
+        'vfla': 187,
+        'vflna': 187,
+        'vflb': 187,
+        'vflnb': 187,
+        'msf': 187,
+        'revf': 187,
+        'iid': 187,
+        'sampid': 187,
+        'barrierid': 187,
+        'tmuwt': 187,
+        'vpmwt': 187,
 
-            'op_rsqrt' : 188,
-            'op_exp' : 188,
-            'op_log' : 188,
-            'op_sin' : 188,
-            'op_rsqrt2' : 188,
+        'op_rsqrt': 188,
+        'op_exp': 188,
+        'op_log': 188,
+        'op_sin': 188,
+        'op_rsqrt2': 188,
 
-            'fcmp' : 192,
+        'fcmp': 192,
 
-            'vfmax' : 240,
+        'vfmax': 240,
 
-            'fround' : 245,
-            'ftoin' : 245,
-            'ftrunc' : 245,
-            'ftoiz' : 245,
-            'ffloor' : 246,
-            'ftouz' : 246,
-            'fceil' : 246,
-            'ftoc' : 246,
-            'fdx' : 247,
-            'fdy' : 247,
+        'fround': 245,
+        'ftoin': 245,
+        'ftrunc': 245,
+        'ftoiz': 245,
+        'ffloor': 246,
+        'ftouz': 246,
+        'fceil': 246,
+        'ftoc': 246,
+        'fdx': 247,
+        'fdy': 247,
 
-            # The stvpms are distinguished by the waddr field.
-            'stvpmv' : 248,
-            'stvpmd' : 248,
-            'stvpmp' : 248,
+        # The stvpms are distinguished by the waddr field.
+        'stvpmv': 248,
+        'stvpmd': 248,
+        'stvpmp': 248,
 
-            'itof' : 252,
-            'clz' : 252,
-            'utof' : 252,
+        'itof': 252,
+        'clz': 252,
+        'utof': 252,
     }
 
     add_op_mux_a = {
-            'nop' : 0,
-            'tidx' : 1,
-            'eidx' : 2,
-            'lr' : 3,
-            'vfla' : 4,
-            'vflna' : 5,
-            'vflb' : 6,
-            'vflnb' : 7,
+        'nop': 0,
+        'tidx': 1,
+        'eidx': 2,
+        'lr': 3,
+        'vfla': 4,
+        'vflna': 5,
+        'vflb': 6,
+        'vflnb': 7,
 
-            'msf' : 0,
-            'revf' : 1,
-            'iid' : 2,
-            'sampid' : 3,
-            'barrierid' : 4,
-            'tmuwt' : 5,
-            'vpmwt' : 6,
+        'msf': 0,
+        'revf': 1,
+        'iid': 2,
+        'sampid': 3,
+        'barrierid': 4,
+        'tmuwt': 5,
+        'vpmwt': 6,
     }
 
     add_op_mux_b = {
-            'bnot' : 0,
-            'neg' : 1,
-            'flapush' : 2,
-            'flbpush' : 3,
-            'flpop' : 4,
-            'op_recip' : 5,
-            'setmsf' : 6,
-            'setrevf' : 7,
+        'bnot': 0,
+        'neg': 1,
+        'flapush': 2,
+        'flbpush': 3,
+        'flpop': 4,
+        'op_recip': 5,
+        'setmsf': 6,
+        'setrevf': 7,
 
-            'nop' : 0,
-            'tidx' : 0,
-            'eidx' : 0,
-            'lr' : 0,
-            'vfla' : 0,
-            'vflna' : 0,
-            'vflb' : 0,
-            'vflnb' : 0,
+        'nop': 0,
+        'tidx': 0,
+        'eidx': 0,
+        'lr': 0,
+        'vfla': 0,
+        'vflna': 0,
+        'vflb': 0,
+        'vflnb': 0,
 
-            'fround' : 0,
-            'ftoin' : 3,
-            'ftrunc' : 4,
-            'ftoiz' : 7,
-            'ffloor' : 0,
-            'ftouz' : 3,
-            'fceil' : 4,
-            'ftoc' : 7,
-            'fdx' : 0,
-            'fdy' : 4,
+        'fround': 0,
+        'ftoin': 3,
+        'ftrunc': 4,
+        'ftoiz': 7,
+        'ffloor': 0,
+        'ftouz': 3,
+        'fceil': 4,
+        'ftoc': 7,
+        'fdx': 0,
+        'fdy': 4,
 
-            'msf' : 2,
-            'revf' : 2,
-            'iid' : 2,
-            'sampid' : 2,
-            'barrierid' : 2,
-            'tmuwt' : 2,
-            'vpmwt' : 2,
+        'msf': 2,
+        'revf': 2,
+        'iid': 2,
+        'sampid': 2,
+        'barrierid': 2,
+        'tmuwt': 2,
+        'vpmwt': 2,
 
-            'op_rsqrt' : 3,
-            'op_exp' : 4,
-            'op_log' : 5,
-            'op_sin' : 6,
-            'op_rsqrt2' : 7,
+        'op_rsqrt': 3,
+        'op_exp': 4,
+        'op_log': 5,
+        'op_sin': 6,
+        'op_rsqrt2': 7,
 
-            'itof' : 0,
-            'clz' : 3,
-            'utof' : 4,
+        'itof': 0,
+        'clz': 3,
+        'utof': 4,
     }
 
     mul_ops = {
-            'add' : 1,
-            'sub' : 2,
-            'umul24' : 3,
-            'vfmul' : 4,
-            'smul24' : 9,
-            'multop' : 10,
-            'fmov' : 14,
-            'nop' : 15,
-            'mov' : 15,
-            'fmul' : 16,
+        'add': 1,
+        'sub': 2,
+        'umul24': 3,
+        'vfmul': 4,
+        'smul24': 9,
+        'multop': 10,
+        'fmov': 14,
+        'nop': 15,
+        'mov': 15,
+        'fmul': 16,
     }
 
     mul_op_mux_a = {
-            'nop' : 0,
+        'nop': 0,
     }
 
     mul_op_mux_b = {
-            'nop' : 4,
-            'mov' : 7,
-            'fmov' : 0,
+        'nop': 4,
+        'mov': 7,
+        'fmov': 0,
     }
 
     # Don't ask me why...
     def sig_to_num(self):
         sigs = {
-                frozenset() : 0,
-                frozenset(['thrsw']) : 1,
-                frozenset(['ldunif']) : 2,
-                frozenset(['thrsw', 'ldunif']) : 3,
-                frozenset(['ldtmu']) : 4,
-                frozenset(['thrsw', 'ldtmu']) : 5,
-                frozenset(['ldtmu', 'ldunif']) : 6,
-                frozenset(['thrsw', 'ldtmu', 'ldunif']) : 7,
-                frozenset(['ldvary']) : 8,
-                frozenset(['thrsw', 'ldvary']) : 9,
-                frozenset(['ldvary', 'ldunif']) : 10,
-                frozenset(['thrsw', 'ldvary', 'ldunif']) : 11,
-                frozenset(['ldunifrf']) : 12,
-                frozenset(['thrsw', 'ldunifrf']) : 13,
-                frozenset(['smimm', 'ldvary']) : 14,
-                frozenset(['smimm']) : 15,
-                frozenset(['ldtlb']) : 16,
-                frozenset(['ldtlbu']) : 17,
-                frozenset(['wrtmuc']) : 18,
-                frozenset(['thrsw', 'wrtmuc']) : 19,
-                frozenset(['ldvary', 'wrtmuc']) : 20,
-                frozenset(['thrsw', 'ldvary', 'wrtmuc']) : 21,
-                frozenset(['ucb']) : 22,
-                frozenset(['rot']) : 23,
-                frozenset(['ldunifa']) : 24,
-                frozenset(['ldunifarf']) : 25,
-                frozenset(['smimm', 'ldtmu']) : 31,
+            frozenset(): 0,
+            frozenset(['thrsw']): 1,
+            frozenset(['ldunif']): 2,
+            frozenset(['thrsw', 'ldunif']): 3,
+            frozenset(['ldtmu']): 4,
+            frozenset(['thrsw', 'ldtmu']): 5,
+            frozenset(['ldtmu', 'ldunif']): 6,
+            frozenset(['thrsw', 'ldtmu', 'ldunif']): 7,
+            frozenset(['ldvary']): 8,
+            frozenset(['thrsw', 'ldvary']): 9,
+            frozenset(['ldvary', 'ldunif']): 10,
+            frozenset(['thrsw', 'ldvary', 'ldunif']): 11,
+            frozenset(['ldunifrf']): 12,
+            frozenset(['thrsw', 'ldunifrf']): 13,
+            frozenset(['smimm', 'ldvary']): 14,
+            frozenset(['smimm']): 15,
+            frozenset(['ldtlb']): 16,
+            frozenset(['ldtlbu']): 17,
+            frozenset(['wrtmuc']): 18,
+            frozenset(['thrsw', 'wrtmuc']): 19,
+            frozenset(['ldvary', 'wrtmuc']): 20,
+            frozenset(['thrsw', 'ldvary', 'wrtmuc']): 21,
+            frozenset(['ucb']): 22,
+            frozenset(['rot']): 23,
+            frozenset(['ldunifa']): 24,
+            frozenset(['ldunifarf']): 25,
+            frozenset(['smimm', 'ldtmu']): 31,
         }
         return sigs[frozenset(self.sig)]
 
     def sig_writes(self):
         # XXX: What if multiple loads are issued?
         return len(self.sig.intersection([
-                'ldunifrf', 'ldunifarf', 'ldvary', 'ldtmu', 'ldtlb', 'ldtlbu'
+            'ldunifrf', 'ldunifarf', 'ldvary', 'ldtmu', 'ldtlb', 'ldtlbu'
         ])) > 0
 
     def cond_to_num(self):
@@ -365,29 +365,29 @@ class Instruction(object):
             return (self.sig_magic << 6) | self.sig_waddr
 
         conds_push = {
-                'pushz' : 1,
-                'pushn' : 2,
-                'pushc' : 3,
+            'pushz': 1,
+            'pushn': 2,
+            'pushc': 3,
         }
         conds_update = {
-                'andz': 4,
-                'andnz': 5,
-                'nornz': 6,
-                'norz': 7,
-                'andn': 8,
-                'andnn': 9,
-                'nornn': 10,
-                'norn': 11,
-                'andc': 12,
-                'andnc': 13,
-                'nornc': 14,
-                'norc': 15,
+            'andz': 4,
+            'andnz': 5,
+            'nornz': 6,
+            'norz': 7,
+            'andn': 8,
+            'andnn': 9,
+            'nornn': 10,
+            'norn': 11,
+            'andc': 12,
+            'andnc': 13,
+            'nornc': 14,
+            'norc': 15,
         }
         conds_insn = {
-                'ifa' : 0,
-                'ifb' : 1,
-                'ifna' : 2,
-                'ifnb' : 3,
+            'ifa': 0,
+            'ifb': 1,
+            'ifna': 2,
+            'ifnb': 3,
         }
 
         add_insn = 1 * int(self.cond_add in conds_insn.keys())
@@ -403,10 +403,10 @@ class Instruction(object):
 
         result = [
             #     none | add_insn | add_push | add_update
-            [         0, 0b0100000,         0,         0 ], # none
-            [ 0b0110000, 0b1000000, 0b0110000, 0b1000000 ], # mul_insn
-            [ 0b0010000, 0b0100000,      None,      None ], # mul_push
-            [ 0b0010000,      None,      None,      None ], # mul_update
+            [0, 0b0100000,         0,         0],  # none
+            [0b0110000, 0b1000000, 0b0110000, 0b1000000],  # mul_insn
+            [0b0010000, 0b0100000,      None,      None],  # mul_push
+            [0b0010000,      None,      None,      None],  # mul_update
         ][mul_cond][add_cond]
 
         assert(result is not None)
@@ -432,16 +432,15 @@ class Instruction(object):
 
         return result
 
-
     def cond_br_to_num(self):
         return {
-                'always' : 0,
-                'a0' : 2,
-                'na0' : 3,
-                'alla' : 4,
-                'anyna' : 5,
-                'anya' : 6,
-                'allna' : 7,
+            'always': 0,
+            'a0': 2,
+            'na0': 3,
+            'alla': 4,
+            'anyna': 5,
+            'anya': 6,
+            'allna': 7,
         }[self.cond_br]
 
     def __init__(self, asm, opr, *args, **kwargs):
@@ -491,26 +490,26 @@ class Instruction(object):
             raise ValueError('Not yet finalized')
         if self.insn_type == 'alu':
             return (self.op_mul << 58) \
-                    | (self.sig_to_num() << 53) \
-                    | (self.cond_to_num() << 46) \
-                    | (self.mm << 45) \
-                    | (self.ma << 44) \
-                    | (self.waddr_m << 38) \
-                    | (self.waddr_a << 32) \
-                    | (self.op_add << 24) \
-                    | (self.mul_b << 21) \
-                    | (self.mul_a << 18) \
-                    | (self.add_b << 15) \
-                    | (self.add_a << 12) \
-                    | ((self.raddr_a if self.raddr_a is not None else 0) << 6) \
-                    | ((self.raddr_b if self.raddr_b is not None else 0) << 0)
+                | (self.sig_to_num() << 53) \
+                | (self.cond_to_num() << 46) \
+                | (self.mm << 45) \
+                | (self.ma << 44) \
+                | (self.waddr_m << 38) \
+                | (self.waddr_a << 32) \
+                | (self.op_add << 24) \
+                | (self.mul_b << 21) \
+                | (self.mul_a << 18) \
+                | (self.add_b << 15) \
+                | (self.add_a << 12) \
+                | ((self.raddr_a if self.raddr_a is not None else 0) << 6) \
+                | ((self.raddr_b if self.raddr_b is not None else 0) << 0)
         elif self.insn_type == 'branch':
             return (0b10 << 56) \
-                    | (((self.addr & ((1 << 24) - 1)) >> 3) << 35) \
-                    | (self.cond_br_to_num() << 32) \
-                    | ((self.addr >> 24) << 24) \
-                    | (self.bdi << 12) \
-                    | ((self.raddr_a if self.raddr_a is not None else 0) << 6)
+                | (((self.addr & ((1 << 24) - 1)) >> 3) << 35) \
+                | (self.cond_br_to_num() << 32) \
+                | ((self.addr >> 24) << 24) \
+                | (self.bdi << 12) \
+                | ((self.raddr_a if self.raddr_a is not None else 0) << 6)
 
     class ALU(object):
 
@@ -564,8 +563,8 @@ class Instruction(object):
             else:
                 raise AssembleError(f'Unknown source register {src}')
 
-        def __init__(self, insn, opr, dst, src1 = None, src2 = None,
-                cond = None, sig = None):
+        def __init__(self, insn, opr, dst, src1=None, src2=None,
+                     cond=None, sig=None):
             # XXX: With Python >= 3.8 we can use positional-only params.
             if src1 is None and src2 is not None:
                 raise AssembleError('src2 is specified while src1 is not')
@@ -605,7 +604,6 @@ class Instruction(object):
                 self.mux_b = self.op_mux_b[opr]
             else:
                 self.mux_b = self.manage_src(insn, src2)
-
 
             if opr in ['fadd', 'faddnf', 'fsub', 'fmax', 'fmin', 'fcmp']:
 
@@ -689,7 +687,6 @@ class Instruction(object):
                 insn.add_a = self.mux_a
                 insn.add_b = self.mux_b
 
-
     class MulALU(ALU):
 
         def __init__(self, insn, *args, **kwargs):
@@ -720,17 +717,22 @@ class Instruction(object):
                 insn.bdi = 1
                 insn.addr_label = src
 
+
 def mov(asm, dst, src, **kwargs):
     return Instruction(asm, 'bor', dst, src, src, **kwargs)
+
 
 def fmul(asm, dst, src1, src2, **kwargs):
     return Instruction(asm, 'nop', Instruction.REGISTERS['null']).fmul(dst, src1, src2, **kwargs)
 
+
 def fmov(asm, dst, src, **kwargs):
     return Instruction(asm, 'nop', Instruction.REGISTERS['null']).fmov(dst, src, **kwargs)
 
+
 def vfmul(asm, dst, src1, src2, **kwargs):
     return Instruction(asm, 'nop', Instruction.REGISTERS['null']).vfmul(dst, src1, src2, **kwargs)
+
 
 _alias_ops = [
     mov,
@@ -738,6 +740,7 @@ _alias_ops = [
     fmul,
     fmov,
 ]
+
 
 def qpu(func):
 
