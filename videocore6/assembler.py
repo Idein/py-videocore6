@@ -601,6 +601,7 @@ class Instruction(object):
                 | (self.bdi << 12) \
                 | ((self.raddr_a if self.raddr_a is not None else 0) << 6)
 
+
 class ALU(object):
 
     # XXX: Type-strict dictionary
@@ -748,6 +749,7 @@ class ALU(object):
             self.op |= (dst.pack_bits >> 1) & 1
             self.mux_b = ((dst.pack_bits & 1) << 2) | a_unpack
 
+
 class AddALU(ALU):
 
     def __init__(self, insn, *args, **kwargs):
@@ -762,6 +764,7 @@ class AddALU(ALU):
         insn.add_a = self.mux_a
         insn.add_b = self.mux_b
 
+
 class MulALU(ALU):
 
     def __init__(self, insn, *args, **kwargs):
@@ -775,6 +778,7 @@ class MulALU(ALU):
         insn.waddr_m = self.waddr
         insn.mul_a = self.mux_a
         insn.mul_b = self.mux_b
+
 
 class Branch(object):
 
