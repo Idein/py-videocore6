@@ -80,8 +80,103 @@ class Register(object):
         assert self.unpack_bits == Register.INPUT_MODIFIER['none']
         return Register(self.name, self.magic, self.waddr, unpack=modifier)
 
+class Signal(object):
+
+    def __init__(self, name, dst = None):
+        self.name = name
+        self.dst = dst
+
+    def is_write(self):
+        ''' Write (to destinatino register) signal '''
+        return self.dst is not None
+
+class WriteSignal(object):
+
+    def __init__(self, name):
+        self.name = name
+
+    def __call__(self, dst):
+        return Signal(self.name, dst)
+
+class Signals(set):
+
+    def __init__(self):
+        super(Signals, self).__init__()
+
+    def add(self, sigs):
+        if isinstance(sigs, WriteSignal):
+            sig = sigs
+            raise AssembleError('"{}" requires destination register (ex. "{}(r0)")'.format(sig.name, sig.name))
+        elif isinstance(sigs, Signal):
+            sig = sigs
+            if sig.name in [s.name for s in self]:
+                raise AssembleError('Signal "{}" is duplicated'.format(sig.name))
+            super(Signals, self).add(sig)
+            if len([s.dst for s in self if s.dst is not None]) > 1:
+                raise AssembleError('Too many signals that require destination register')
+        elif isinstance(sigs, (list, tuple, set)):
+            for sig in sigs:
+                self.add(sig)
+        else:
+            raise AssembleError('Invalid signal instance')
+
+    def __int__(self):
+        return {
+            frozenset(): 0,
+            frozenset(['thrsw']): 1,
+            frozenset(['ldunif']): 2,
+            frozenset(['thrsw', 'ldunif']): 3,
+            frozenset(['ldtmu']): 4,
+            frozenset(['thrsw', 'ldtmu']): 5,
+            frozenset(['ldtmu', 'ldunif']): 6,
+            frozenset(['thrsw', 'ldtmu', 'ldunif']): 7,
+            frozenset(['ldvary']): 8,
+            frozenset(['thrsw', 'ldvary']): 9,
+            frozenset(['ldvary', 'ldunif']): 10,
+            frozenset(['thrsw', 'ldvary', 'ldunif']): 11,
+            frozenset(['ldunifrf']): 12,
+            frozenset(['thrsw', 'ldunifrf']): 13,
+            frozenset(['smimm', 'ldvary']): 14,
+            frozenset(['smimm']): 15,
+            frozenset(['ldtlb']): 16,
+            frozenset(['ldtlbu']): 17,
+            frozenset(['wrtmuc']): 18,
+            frozenset(['thrsw', 'wrtmuc']): 19,
+            frozenset(['ldvary', 'wrtmuc']): 20,
+            frozenset(['thrsw', 'ldvary', 'wrtmuc']): 21,
+            frozenset(['ucb']): 22,
+            frozenset(['rot']): 23,
+            frozenset(['ldunifa']): 24,
+            frozenset(['ldunifarf']): 25,
+            frozenset(['smimm', 'ldtmu']): 31,
+        }[frozenset([sig.name for sig in self])]
+
+    def is_write(self):
+        return any([sig.is_write() for sig in self])
+
+    def write_address(self):
+        assert self.is_write()
+        dst = [sig.dst for sig in self if sig.dst is not None][0]
+        return (dst.magic << 6) | dst.waddr
 
 class Instruction(object):
+
+    SIGNALS = {
+        'thrsw': Signal('thrsw'),
+        'ldunif': Signal('ldunif'),
+        'ldunifa': Signal('ldunifa'),
+        'ldunifrf': WriteSignal('ldunifrf'),
+        'ldunifarf': WriteSignal('ldunifarf'),
+        'ldtmu': WriteSignal('ldtmu'),
+        'ldvary': WriteSignal('ldvary'),
+        'ldvpm': Signal('ldvpm'),
+        'ldtlb': WriteSignal('ldtlb'),
+        'ldtlbu': WriteSignal('ldtlbu'),
+        'smimm': Signal('smimm'),
+        'ucb': Signal('ucb'),
+        'rot': Signal('rot'),
+        'wrtmuc': Signal('wrtmuc'),
+    }
 
     REGISTERS = {
         name: Register(name, 1, addr)
@@ -353,15 +448,9 @@ class Instruction(object):
         }
         return sigs[frozenset(self.sig)]
 
-    def sig_writes(self):
-        # XXX: What if multiple loads are issued?
-        return len(self.sig.intersection([
-            'ldunifrf', 'ldunifarf', 'ldvary', 'ldtmu', 'ldtlb', 'ldtlbu'
-        ])) > 0
-
     def cond_to_num(self):
-        if self.sig_writes():
-            return (self.sig_magic << 6) | self.sig_waddr
+        if self.sig.is_write():
+            return self.sig.write_address()
 
         conds_push = {
             'pushz': 1,
@@ -448,9 +537,7 @@ class Instruction(object):
         self.insn_type = 'alu'
         self.finalized = False
 
-        self.sig = set()
-        self.sig_magic = Instruction.REGISTERS['null'].magic
-        self.sig_waddr = Instruction.REGISTERS['null'].waddr
+        self.sig = Signals()
 
         self.cond_add = None
         self.cond_mul = None
@@ -489,7 +576,7 @@ class Instruction(object):
             raise ValueError('Not yet finalized')
         if self.insn_type == 'alu':
             return (self.op_mul << 58) \
-                | (self.sig_to_num() << 53) \
+                | (int(self.sig) << 53) \
                 | (self.cond_to_num() << 46) \
                 | (self.mm << 45) \
                 | (self.ma << 44) \
@@ -538,9 +625,9 @@ class Instruction(object):
                     rb = self.smimms_float[src]
                 if insn.raddr_b is None:
                     insn.raddr_b = rb
-                    insn.sig.add('smimm')
+                    insn.sig.add(Instruction.SIGNALS['smimm'])
                 else:
-                    if 'smimm' not in insn.sig:
+                    if Instruction.SIGNALS['smimm'] not in insn.sig:
                         raise AssembleError('Too many requests for raddr_b')
                     elif insn.raddr_b != rb:
                         raise AssembleError('Small immediates conflict')
@@ -552,7 +639,7 @@ class Instruction(object):
                 if insn.raddr_a in [None, idx]:
                     insn.raddr_a = idx
                     return 6
-                elif 'smimm' not in insn.sig and insn.raddr_b in [None, idx]:
+                elif Instruction.SIGNALS['smimm'] not in insn.sig and insn.raddr_b in [None, idx]:
                     insn.raddr_b = idx
                     return 7
                 else:
@@ -571,25 +658,11 @@ class Instruction(object):
             insn.insn_type = 'alu'
 
             if sig is not None:
-                if isinstance(sig, str):
-                    insn.sig = insn.sig.union(sig.split())
-                elif isinstance(sig, (list, tuple)):
-                    insn.sig = insn.sig.union(sig)
-                else:
-                    raise AssembleError('Unknown object specified for sig')
+                insn.sig.add(sig)
 
             self.cond = cond
 
             self.op = self.ops[opr]
-
-            if insn.sig_writes():
-                if (self.cond is not None and self.cond != '') or \
-                        (insn.cond_add is not None and insn.cond_add != ''):
-                    raise AssembleError('cond must be none with sig write')
-                # XXX: Don't specify dest regs to both add and mul for now!
-                insn.sig_magic = dst.magic
-                insn.sig_waddr = dst.waddr
-                return
 
             self.magic = dst.magic
             self.waddr = dst.waddr
@@ -680,11 +753,10 @@ class Instruction(object):
             super().__init__(insn, *args, **kwargs)
             insn.cond_add = self.cond
             insn.op_add = self.op
-            if not insn.sig_writes():
-                insn.ma = self.magic
-                insn.waddr_a = self.waddr
-                insn.add_a = self.mux_a
-                insn.add_b = self.mux_b
+            insn.ma = self.magic
+            insn.waddr_a = self.waddr
+            insn.add_a = self.mux_a
+            insn.add_b = self.mux_b
 
     class MulALU(ALU):
 
@@ -695,11 +767,10 @@ class Instruction(object):
             super().__init__(insn, *args, **kwargs)
             insn.cond_mul = self.cond
             insn.op_mul = self.op
-            if not insn.sig_writes():
-                insn.mm = self.magic
-                insn.waddr_m = self.waddr
-                insn.mul_a = self.mux_a
-                insn.mul_b = self.mux_b
+            insn.mm = self.magic
+            insn.waddr_m = self.waddr
+            insn.mul_a = self.mux_a
+            insn.mul_b = self.mux_b
 
     class Branch(object):
 
@@ -756,6 +827,8 @@ def qpu(func):
             g[alias_op.__name__] = functools.partial(alias_op, asm)
         for waddr, reg in Instruction.REGISTERS.items():
             g[waddr] = reg
+        for name, sig  in Instruction.SIGNALS.items():
+            g[name] = sig
         func(asm, *args, **kwargs)
         g.clear()
         for key, value in g_orig.items():
