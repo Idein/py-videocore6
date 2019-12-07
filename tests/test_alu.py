@@ -81,9 +81,9 @@ ops = {
 @qpu
 def qpu_binary_ops(asm, bin_ops, dst_ops, src1_ops, src2_ops):
 
-    eidx(r0, sig = 'ldunif')
-    mov(rf0, r5, sig = 'ldunif') # in
-    mov(rf1, r5, sig = 'ldunif')  # out
+    eidx(r0, sig = ldunif)
+    mov(rf0, r5, sig = ldunif) # in
+    mov(rf1, r5, sig = ldunif)  # out
     shl(r3, 4, 4).mov(rf2, r5)
 
     shl(r0, r0, 2)
@@ -91,12 +91,12 @@ def qpu_binary_ops(asm, bin_ops, dst_ops, src1_ops, src2_ops):
     add(rf1, rf1, r0)
     add(rf2, rf2, r0)
 
-    mov(tmua, rf0, sig = 'thrsw').add(rf0, rf0, r3)
+    mov(tmua, rf0, sig = thrsw).add(rf0, rf0, r3)
     nop(null)
-    mov(tmua, rf1, sig = 'thrsw').add(rf1, rf1, r3)
-    nop(r1, sig = 'ldtmu')
+    mov(tmua, rf1, sig = thrsw).add(rf1, rf1, r3)
+    nop(null, sig = ldtmu(r1))
     nop(null)
-    nop(r2, sig = 'ldtmu')
+    nop(null, sig = ldtmu(r2))
 
     g = globals()
     for op, pack, unpack1, unpack2 in itertools.product(bin_ops, dst_ops, src1_ops, src2_ops):
@@ -109,11 +109,11 @@ def qpu_binary_ops(asm, bin_ops, dst_ops, src1_ops, src2_ops):
         mov(tmua, rf2)
         tmuwt(null).add(rf2, rf2, r3)
 
-    nop(null, sig = 'thrsw')
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
     nop(null)
@@ -196,18 +196,18 @@ def test_binary_ops():
 @qpu
 def qpu_unary_ops(asm, bin_ops, dst_ops, src_ops):
 
-    eidx(r0, sig = 'ldunif')
-    mov(rf0, r5, sig = 'ldunif') # in
+    eidx(r0, sig = ldunif)
+    mov(rf0, r5, sig = ldunif) # in
     shl(r3, 4, 4).mov(rf1, r5)
 
     shl(r0, r0, 2)
     add(rf0, rf0, r0)
     add(rf1, rf1, r0)
 
-    mov(tmua, rf0, sig = 'thrsw').add(rf0, rf0, r3)
+    mov(tmua, rf0, sig = thrsw).add(rf0, rf0, r3)
     nop(null)
     nop(null)
-    nop(r1, sig = 'ldtmu')
+    nop(null, sig = ldtmu(r1))
 
     g = globals()
     for op, pack, unpack in itertools.product(bin_ops, dst_ops, src_ops):
@@ -219,11 +219,11 @@ def qpu_unary_ops(asm, bin_ops, dst_ops, src_ops):
         mov(tmua, rf1)
         tmuwt(null).add(rf1, rf1, r3)
 
-    nop(null, sig = 'thrsw')
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
     nop(null)

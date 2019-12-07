@@ -118,7 +118,7 @@ class Signals(set):
             for sig in sigs:
                 self.add(sig)
         else:
-            raise AssembleError('Invalid signal instance')
+            raise AssembleError('Invalid signal object')
 
     def __int__(self):
         return {
