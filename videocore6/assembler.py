@@ -204,12 +204,12 @@ class Instruction(object):
             'sync',
             'syncu',
             'syncb',
-            'recip',
-            'rsqrt',
-            'exp',
-            'log',
-            'sin',
-            'rsqrt2',
+            '_reg_recip',
+            '_reg_rsqrt',
+            '_reg_exp',
+            '_reg_log',
+            '_reg_sin',
+            '_reg_rsqrt2',
             '',
             '',
             '',
@@ -277,7 +277,7 @@ class Instruction(object):
         'flapush': 186,
         'flbpush': 186,
         'flpop': 186,
-        'op_recip': 186,
+        '_op_recip': 186,
         'setmsf': 186,
         'setrevf': 186,
 
@@ -297,11 +297,11 @@ class Instruction(object):
         'tmuwt': 187,
         'vpmwt': 187,
 
-        'op_rsqrt': 188,
-        'op_exp': 188,
-        'op_log': 188,
-        'op_sin': 188,
-        'op_rsqrt2': 188,
+        '_op_rsqrt': 188,
+        '_op_exp': 188,
+        '_op_log': 188,
+        '_op_sin': 188,
+        '_op_rsqrt2': 188,
 
         'fcmp': 192,
 
@@ -353,7 +353,7 @@ class Instruction(object):
         'flapush': 2,
         'flbpush': 3,
         'flpop': 4,
-        'op_recip': 5,
+        '_op_recip': 5,
         'setmsf': 6,
         'setrevf': 7,
 
@@ -385,11 +385,11 @@ class Instruction(object):
         'tmuwt': 2,
         'vpmwt': 2,
 
-        'op_rsqrt': 3,
-        'op_exp': 4,
-        'op_log': 5,
-        'op_sin': 6,
-        'op_rsqrt2': 7,
+        '_op_rsqrt': 3,
+        '_op_exp': 4,
+        '_op_log': 5,
+        '_op_sin': 6,
+        '_op_rsqrt2': 7,
 
         'itof': 0,
         'clz': 3,
@@ -816,6 +816,19 @@ _alias_ops = [
 ]
 
 
+class SFUIntegrator(Register):
+
+    def __init__(self, asm, name):
+        self.asm = asm
+        self.reg_name = '_reg_'+name
+        self.op_name = '_op_'+name
+        reg = Instruction.REGISTERS[self.reg_name]
+        super(SFUIntegrator, self).__init__(reg.name, reg.magic, reg.waddr)
+
+    def __call__(self, dst, src, **kwargs):
+        return Instruction(self.asm, self.op_name, dst, src, **kwargs)
+
+
 def qpu(func):
 
     @functools.wraps(func)
@@ -826,11 +839,15 @@ def qpu(func):
         g['R'] = Reference()
         g['b'] = functools.partial(Instruction, asm, 'b')
         for add_op in Instruction.add_ops.keys():
-            g[add_op] = functools.partial(Instruction, asm, add_op)
+            if not add_op.startswith('_op_'):
+                g[add_op] = functools.partial(Instruction, asm, add_op)
         for alias_op in _alias_ops:
             g[alias_op.__name__] = functools.partial(alias_op, asm)
         for waddr, reg in Instruction.REGISTERS.items():
-            g[waddr] = reg
+            if waddr.startswith('_reg_'):
+                g[waddr[5:]] = SFUIntegrator(asm, waddr[5:])
+            else:
+                g[waddr] = reg
         for name, sig in Instruction.SIGNALS.items():
             g[name] = sig
         func(asm, *args, **kwargs)
