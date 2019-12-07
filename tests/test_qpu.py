@@ -7,7 +7,7 @@ from videocore6.assembler import qpu
 @qpu
 def qpu_clock(asm):
 
-    nop(sig = 'ldunif')
+    nop(sig = ldunif)
 
     L.loop
     sub(r5, r5, 1, cond = 'pushn')
@@ -16,11 +16,11 @@ def qpu_clock(asm):
     nop()
     nop()
 
-    nop(sig = 'thrsw')
-    nop(sig = 'thrsw')
+    nop(sig = thrsw)
+    nop(sig = thrsw)
     nop()
     nop()
-    nop(sig = 'thrsw')
+    nop(sig = thrsw)
     nop()
     nop()
     nop()
@@ -49,8 +49,8 @@ def test_clock():
 @qpu
 def qpu_tmu_write(asm):
 
-    nop(sig = 'ldunif')
-    bor(r1, r5, r5, sig = 'ldunif')
+    nop(sig = ldunif)
+    mov(r1, r5, sig = ldunif)
 
     # r2 = addr + eidx * 4
     # rf0 = eidx
@@ -73,11 +73,11 @@ def qpu_tmu_write(asm):
         shl(r0, 4, 4)
         tmuwt().add(r2, r2, r0)
 
-    nop(sig = 'thrsw')
-    nop(sig = 'thrsw')
+    nop(sig = thrsw)
+    nop(sig = thrsw)
     nop()
     nop()
-    nop(sig = 'thrsw')
+    nop(sig = thrsw)
     nop()
     nop()
     nop()
@@ -111,19 +111,19 @@ def qpu_tmu_read(asm):
     # r0: Number of vectors to read.
     # r1: Pointer to the read vectors + eidx * 4.
     # r2: Pointer to the write vectors + eidx * 4
-    eidx(r2, sig = 'ldunif')
-    nop(null, sig = 'ldunif').mov(r0, r5)
+    eidx(r2, sig = ldunif)
+    mov(r0, r5, sig = ldunif)
     shl(r2, r2, 2).mov(r1, r5)
-    add(r1, r1, r2, sig = 'ldunif')
+    add(r1, r1, r2, sig = ldunif)
     add(r2, r5, r2)
 
     L.loop
     if True:
 
-        nop(null).mov(tmua, r1, sig = 'thrsw')
-        nop(null)
-        nop(null)
-        nop(rf0, sig = 'ldtmu')
+        mov(tmua, r1, sig = thrsw)
+        nop()
+        nop()
+        nop(sig = ldtmu(rf0))
 
         sub(r0, r0, 1, cond = 'pushz').add(tmud, rf0, 1)
         b(R.loop, cond = 'anyna')
@@ -131,16 +131,16 @@ def qpu_tmu_read(asm):
         # r1 += 64
         # r2 += 64
         add(r1, r1, r3).add(r2, r2, r3)
-        tmuwt(null)
+        tmuwt()
 
-    nop(null, sig = 'thrsw')
-    nop(null, sig = 'thrsw')
-    nop(null)
-    nop(null)
-    nop(null, sig = 'thrsw')
-    nop(null)
-    nop(null)
-    nop(null)
+    nop(sig = thrsw)
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop()
 
 
 def test_tmu_read():
