@@ -80,15 +80,17 @@ class Register(object):
         assert self.unpack_bits == Register.INPUT_MODIFIER['none']
         return Register(self.name, self.magic, self.waddr, unpack=modifier)
 
+
 class Signal(object):
 
-    def __init__(self, name, dst = None):
+    def __init__(self, name, dst=None):
         self.name = name
         self.dst = dst
 
     def is_write(self):
         ''' Write (to destinatino register) signal '''
         return self.dst is not None
+
 
 class WriteSignal(object):
 
@@ -97,6 +99,7 @@ class WriteSignal(object):
 
     def __call__(self, dst):
         return Signal(self.name, dst)
+
 
 class Signals(set):
 
@@ -158,6 +161,7 @@ class Signals(set):
         assert self.is_write()
         dst = [sig.dst for sig in self if sig.dst is not None][0]
         return (dst.magic << 6) | dst.waddr
+
 
 class Instruction(object):
 
@@ -827,7 +831,7 @@ def qpu(func):
             g[alias_op.__name__] = functools.partial(alias_op, asm)
         for waddr, reg in Instruction.REGISTERS.items():
             g[waddr] = reg
-        for name, sig  in Instruction.SIGNALS.items():
+        for name, sig in Instruction.SIGNALS.items():
             g[name] = sig
         func(asm, *args, **kwargs)
         g.clear()
