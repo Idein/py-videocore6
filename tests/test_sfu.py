@@ -26,18 +26,18 @@ ops = {
 @qpu
 def qpu_sfu_regs(asm, sfu_regs):
 
-    eidx(r0, sig = 'ldunif')
-    mov(rf0, r5, sig = 'ldunif') # in
+    eidx(r0, sig = ldunif)
+    mov(rf0, r5, sig = ldunif) # in
     shl(r3, 4, 4).mov(rf1, r5)
 
     shl(r0, r0, 2)
     add(rf0, rf0, r0)
     add(rf1, rf1, r0)
 
-    mov(tmua, rf0, sig = 'thrsw').add(rf0, rf0, r3)
+    mov(tmua, rf0, sig = thrsw).add(rf0, rf0, r3)
     nop(null)
     nop(null)
-    nop(r1, sig = 'ldtmu')
+    nop(null, sig = ldtmu(r1))
 
     g = globals()
     for reg in sfu_regs:
@@ -47,11 +47,11 @@ def qpu_sfu_regs(asm, sfu_regs):
         mov(tmua, rf1)
         tmuwt(null).add(rf1, rf1, r3)
 
-    nop(null, sig = 'thrsw')
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
     nop(null)
@@ -88,18 +88,18 @@ def test_sfu_regs():
 @qpu
 def qpu_sfu_ops(asm, sfu_ops):
 
-    eidx(r0, sig = 'ldunif')
-    mov(rf0, r5, sig = 'ldunif') # in
+    eidx(r0, sig = ldunif)
+    mov(rf0, r5, sig = ldunif) # in
     shl(r3, 4, 4).mov(rf1, r5)
 
     shl(r0, r0, 2)
     add(rf0, rf0, r0)
     add(rf1, rf1, r0)
 
-    mov(tmua, rf0, sig = 'thrsw').add(rf0, rf0, r3)
+    mov(tmua, rf0, sig = thrsw).add(rf0, rf0, r3)
     nop(null)
     nop(null)
-    nop(r1, sig = 'ldtmu')
+    nop(null, sig = ldtmu(r1))
 
     g = globals()
     for op in sfu_ops:
@@ -109,11 +109,11 @@ def qpu_sfu_ops(asm, sfu_ops):
         mov(tmua, rf1)
         tmuwt(null).add(rf1, rf1, r3)
 
-    nop(null, sig = 'thrsw')
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
     nop(null)

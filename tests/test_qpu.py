@@ -7,7 +7,7 @@ from videocore6.assembler import qpu
 @qpu
 def qpu_clock(asm):
 
-    nop(null, sig = 'ldunif')
+    nop(null, sig = ldunif)
 
     L.loop
     sub(r5, r5, 1, cond = 'pushn')
@@ -16,11 +16,11 @@ def qpu_clock(asm):
     nop(null)
     nop(null)
 
-    nop(null, sig = 'thrsw')
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
     nop(null)
@@ -49,8 +49,8 @@ def test_clock():
 @qpu
 def qpu_tmu_write(asm):
 
-    nop(null, sig = 'ldunif')
-    mov(r1, r5, sig = 'ldunif')
+    nop(null, sig = ldunif)
+    mov(r1, r5, sig = ldunif)
 
     # r2 = addr + eidx * 4
     # rf0 = eidx
@@ -73,11 +73,11 @@ def qpu_tmu_write(asm):
         shl(r0, 4, 4)
         tmuwt(null).add(r2, r2, r0)
 
-    nop(null, sig = 'thrsw')
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
     nop(null)
@@ -111,19 +111,19 @@ def qpu_tmu_read(asm):
     # r0: Number of vectors to read.
     # r1: Pointer to the read vectors + eidx * 4.
     # r2: Pointer to the write vectors + eidx * 4
-    eidx(r2, sig = 'ldunif')
-    mov(r0, r5, sig = 'ldunif')
+    eidx(r2, sig = ldunif)
+    mov(r0, r5, sig = ldunif)
     shl(r2, r2, 2).mov(r1, r5)
-    add(r1, r1, r2, sig = 'ldunif')
+    add(r1, r1, r2, sig = ldunif)
     add(r2, r5, r2)
 
     L.loop
     if True:
 
-        mov(tmua, r1, sig = 'thrsw')
+        mov(tmua, r1, sig = thrsw)
         nop(null)
         nop(null)
-        nop(rf0, sig = 'ldtmu')
+        nop(null, sig = ldtmu(rf0))
 
         sub(r0, r0, 1, cond = 'pushz').add(tmud, rf0, 1)
         b(R.loop, cond = 'anyna')
@@ -133,11 +133,11 @@ def qpu_tmu_read(asm):
         add(r1, r1, r3).add(r2, r2, r3)
         tmuwt(null)
 
-    nop(null, sig = 'thrsw')
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
     nop(null)

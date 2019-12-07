@@ -9,7 +9,7 @@ import numpy as np
 @qpu
 def qpu_cond_push_a(asm):
 
-    eidx(r0, sig = 'ldunif')
+    eidx(r0, sig = ldunif)
     mov(r2, r5)
     shl(r0, r0, 2)
     add(r2, r2, r0)
@@ -35,11 +35,11 @@ def qpu_cond_push_a(asm):
         mov(tmua, r2)
         tmuwt(null).add(r2, r2, r1)
 
-    nop(null, sig = 'thrsw')
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
     nop(null)
@@ -80,7 +80,7 @@ def test_cond_push_a():
 @qpu
 def qpu_cond_push_b(asm):
 
-    eidx(r0, sig = 'ldunif')
+    eidx(r0, sig = ldunif)
     mov(r2, r5)
     shl(r0, r0, 2)
     add(r2, r2, r0)
@@ -115,11 +115,11 @@ def qpu_cond_push_b(asm):
     mov(tmua, r2)
     tmuwt(null).add(r2, r2, r1)
 
-    nop(null, sig = 'thrsw')
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
     nop(null)
@@ -162,7 +162,7 @@ def test_cond_push_b():
 @qpu
 def qpu_cond_update(asm, cond_update_flags):
 
-    eidx(r0, sig = 'ldunif')
+    eidx(r0, sig = ldunif)
     mov(r2, r5)
     shl(r0, r0, 2)
     add(r2, r2, r0)
@@ -190,11 +190,11 @@ def qpu_cond_update(asm, cond_update_flags):
         mov(tmua, r2)
         tmuwt(null).add(r2, r2, r1)
 
-    nop(null, sig = 'thrsw')
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
     nop(null)
@@ -249,7 +249,7 @@ def test_cond_update():
 @qpu
 def qpu_cond_combination(asm):
 
-    eidx(r0, sig = 'ldunif')
+    eidx(r0, sig = ldunif)
     mov(r2, r5)
     shl(r0, r0, 2)
     add(r2, r2, r0)
@@ -309,11 +309,11 @@ def qpu_cond_combination(asm):
     mov(tmua, r2)
     tmuwt(null).add(r2, r2, r1)
 
-    nop(null, sig = 'thrsw')
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
     nop(null)
@@ -353,7 +353,7 @@ def test_cond_combination():
 @qpu
 def qpu_cond_vflx(asm, ops):
 
-    eidx(r0, sig = 'ldunif')
+    eidx(r0, sig = ldunif)
     mov(r2, r5)
     shl(r0, r0, 2)
     add(r2, r2, r0)
@@ -373,11 +373,11 @@ def qpu_cond_vflx(asm, ops):
         mov(tmua, r2)
         tmuwt(null).add(r2, r2, r1)
 
-    nop(null, sig = 'thrsw')
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
     nop(null)
@@ -422,7 +422,7 @@ def test_cond_vflx():
 @qpu
 def qpu_cond_vflx(asm, ops):
 
-    eidx(r0, sig = 'ldunif')
+    eidx(r0, sig = ldunif)
     mov(r2, r5)
     shl(r0, r0, 2)
     add(r2, r2, r0)
@@ -442,11 +442,11 @@ def qpu_cond_vflx(asm, ops):
         mov(tmua, r2)
         tmuwt(null).add(r2, r2, r1)
 
-    nop(null, sig = 'thrsw')
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
     nop(null)
@@ -490,9 +490,9 @@ def test_cond_vflx():
 @qpu
 def qpu_cond_flx(asm, ops):
 
-    eidx(r0, sig = 'ldunif')
-    mov(rf0, r5, sig = 'ldunif') # in
-    mov(rf1, r5, sig = 'ldunif')  # out
+    eidx(r0, sig = ldunif)
+    mov(rf0, r5, sig = ldunif) # in
+    mov(rf1, r5, sig = ldunif)  # out
     shl(r3, 4, 4).mov(rf2, r5)
 
     shl(r0, r0, 2)
@@ -500,12 +500,12 @@ def qpu_cond_flx(asm, ops):
     add(rf1, rf1, r0)
     add(rf2, rf2, r0)
 
-    mov(tmua, rf0, sig = 'thrsw').add(rf0, rf0, r3)
+    mov(tmua, rf0, sig = thrsw).add(rf0, rf0, r3)
     nop(null)
-    mov(tmua, rf1, sig = 'thrsw').add(rf1, rf1, r3)
-    nop(r1, sig = 'ldtmu')
+    mov(tmua, rf1, sig = thrsw).add(rf1, rf1, r3)
+    nop(null, sig = ldtmu(r1))
     nop(null)
-    nop(r2, sig = 'ldtmu')
+    nop(null, sig = ldtmu(r2))
 
     # init fla/flb
     mov(null, r2, cond = 'pushn')
@@ -517,11 +517,11 @@ def qpu_cond_flx(asm, ops):
         mov(tmua, rf2)
         tmuwt(null).add(rf2, rf2, r3)
 
-    nop(null, sig = 'thrsw')
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
-    nop(null, sig = 'thrsw')
+    nop(null, sig = thrsw)
     nop(null)
     nop(null)
     nop(null)
