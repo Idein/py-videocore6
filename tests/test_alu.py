@@ -92,11 +92,11 @@ def qpu_binary_ops(asm, bin_ops, dst_ops, src1_ops, src2_ops):
     add(rf2, rf2, r0)
 
     mov(tmua, rf0, sig = thrsw).add(rf0, rf0, r3)
-    nop(null)
+    nop()
     mov(tmua, rf1, sig = thrsw).add(rf1, rf1, r3)
-    nop(null, sig = ldtmu(r1))
-    nop(null)
-    nop(null, sig = ldtmu(r2))
+    nop(sig = ldtmu(r1))
+    nop()
+    nop(sig = ldtmu(r2))
 
     g = globals()
     for op, pack, unpack1, unpack2 in itertools.product(bin_ops, dst_ops, src1_ops, src2_ops):
@@ -107,16 +107,16 @@ def qpu_binary_ops(asm, bin_ops, dst_ops, src1_ops, src2_ops):
         )
         mov(tmud, r0)
         mov(tmua, rf2)
-        tmuwt(null).add(rf2, rf2, r3)
+        tmuwt().add(rf2, rf2, r3)
 
-    nop(null, sig = thrsw)
-    nop(null, sig = thrsw)
-    nop(null)
-    nop(null)
-    nop(null, sig = thrsw)
-    nop(null)
-    nop(null)
-    nop(null)
+    nop(sig = thrsw)
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop()
 
 def boilerplate_binary_ops(bin_ops, dst, src1, src2):
 
@@ -205,9 +205,9 @@ def qpu_unary_ops(asm, bin_ops, dst_ops, src_ops):
     add(rf1, rf1, r0)
 
     mov(tmua, rf0, sig = thrsw).add(rf0, rf0, r3)
-    nop(null)
-    nop(null)
-    nop(null, sig = ldtmu(r1))
+    nop()
+    nop()
+    nop(sig = ldtmu(r1))
 
     g = globals()
     for op, pack, unpack in itertools.product(bin_ops, dst_ops, src_ops):
@@ -217,16 +217,16 @@ def qpu_unary_ops(asm, bin_ops, dst_ops, src_ops):
         )
         mov(tmud, r0)
         mov(tmua, rf1)
-        tmuwt(null).add(rf1, rf1, r3)
+        tmuwt().add(rf1, rf1, r3)
 
-    nop(null, sig = thrsw)
-    nop(null, sig = thrsw)
-    nop(null)
-    nop(null)
-    nop(null, sig = thrsw)
-    nop(null)
-    nop(null)
-    nop(null)
+    nop(sig = thrsw)
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop()
 
 def boilerplate_unary_ops(uni_ops, dst, src):
 

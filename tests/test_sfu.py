@@ -35,26 +35,26 @@ def qpu_sfu_regs(asm, sfu_regs):
     add(rf1, rf1, r0)
 
     mov(tmua, rf0, sig = thrsw).add(rf0, rf0, r3)
-    nop(null)
-    nop(null)
-    nop(null, sig = ldtmu(r1))
+    nop()
+    nop()
+    nop(sig = ldtmu(r1))
 
     g = globals()
     for reg in sfu_regs:
         mov(g[reg], r1)
-        nop(null) # required ? enough ?
+        nop() # required ? enough ?
         mov(tmud, r4)
         mov(tmua, rf1)
-        tmuwt(null).add(rf1, rf1, r3)
+        tmuwt().add(rf1, rf1, r3)
 
-    nop(null, sig = thrsw)
-    nop(null, sig = thrsw)
-    nop(null)
-    nop(null)
-    nop(null, sig = thrsw)
-    nop(null)
-    nop(null)
-    nop(null)
+    nop(sig = thrsw)
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop()
 
 def boilerplate_sfu_regs(sfu_regs, domain_limitter):
 
@@ -97,25 +97,25 @@ def qpu_sfu_ops(asm, sfu_ops):
     add(rf1, rf1, r0)
 
     mov(tmua, rf0, sig = thrsw).add(rf0, rf0, r3)
-    nop(null)
-    nop(null)
-    nop(null, sig = ldtmu(r1))
+    nop()
+    nop()
+    nop(sig = ldtmu(r1))
 
     g = globals()
     for op in sfu_ops:
         g[op](rf2, r1) # ATTENTION: SFU ops requires rfN ?
         mov(tmud, rf2)
         mov(tmua, rf1)
-        tmuwt(null).add(rf1, rf1, r3)
+        tmuwt().add(rf1, rf1, r3)
 
-    nop(null, sig = thrsw)
-    nop(null, sig = thrsw)
-    nop(null)
-    nop(null)
-    nop(null, sig = thrsw)
-    nop(null)
-    nop(null)
-    nop(null)
+    nop(sig = thrsw)
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop()
 
 def boilerplate_sfu_ops(sfu_ops, domain_limitter):
 

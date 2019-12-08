@@ -23,22 +23,22 @@ def qpu_signal_ldtmu(asm):
     fadd(r0, r0, r0).fmul(r1, r1, r1, sig = ldtmu(rf31)) # r0 <- 2 * r0, r1 <- r1 ^ 2, rf31 <- X
     mov(tmud, rf31)
     mov(tmua, rf1)
-    tmuwt(null).add(rf1, rf1, r3)
+    tmuwt().add(rf1, rf1, r3)
     mov(tmud, r0)
     mov(tmua, rf1)
-    tmuwt(null).add(rf1, rf1, r3)
+    tmuwt().add(rf1, rf1, r3)
     mov(tmud, r1)
     mov(tmua, rf1)
-    tmuwt(null).add(rf1, rf1, r3)
+    tmuwt().add(rf1, rf1, r3)
 
-    nop(null, sig = thrsw)
-    nop(null, sig = thrsw)
-    nop(null)
-    nop(null)
-    nop(null, sig = thrsw)
-    nop(null)
-    nop(null)
-    nop(null)
+    nop(sig = thrsw)
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop()
 
 def test_signal_ldtmu():
 
