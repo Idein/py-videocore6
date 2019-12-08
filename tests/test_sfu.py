@@ -11,13 +11,13 @@ def sfu_sin(x):
     return result
 
 ops = {
-    # sfu ops
-    'op_recip' : lambda x: 1 / x,
-    'op_rsqrt' : lambda x: 1 / np.sqrt(x),
-    'op_exp' : lambda x: 2 ** x,
-    'op_log' : np.log2,
-    'op_sin' : sfu_sin,
-    'op_rsqrt2' : lambda x: 1 / np.sqrt(x),
+    # sfu regs/ops
+    'recip' : lambda x: 1 / x,
+    'rsqrt' : lambda x: 1 / np.sqrt(x),
+    'exp' : lambda x: 2 ** x,
+    'log' : np.log2,
+    'sin' : sfu_sin,
+    'rsqrt2' : lambda x: 1 / np.sqrt(x),
 }
 
 
@@ -77,7 +77,7 @@ def boilerplate_sfu_regs(sfu_regs, domain_limitter):
 
         for ix, reg in enumerate(sfu_regs):
             msg = 'mov({}, None)'.format(reg)
-            assert np.allclose(Y[ix], ops['op_'+reg](X), rtol=1e-4), msg
+            assert np.allclose(Y[ix], ops[reg](X), rtol=1e-4), msg
 
 def test_sfu_regs():
     boilerplate_sfu_regs(['recip','exp','sin'], lambda x: x)
@@ -103,8 +103,7 @@ def qpu_sfu_ops(asm, sfu_ops):
 
     g = globals()
     for op in sfu_ops:
-        g['op_'+op](rf2, r1) # ATTENTION: SFU ops requires rfN ?
-        nop()
+        g[op](rf2, r1) # ATTENTION: SFU ops requires rfN ?
         mov(tmud, rf2)
         mov(tmua, rf1)
         tmuwt().add(rf1, rf1, r3)
@@ -139,7 +138,7 @@ def boilerplate_sfu_ops(sfu_ops, domain_limitter):
 
         for ix, op in enumerate(sfu_ops):
             msg = '{}(None, None)'.format(op)
-            assert np.allclose(Y[ix], ops['op_'+op](X), rtol=1e-4), msg
+            assert np.allclose(Y[ix], ops[op](X), rtol=1e-4), msg
 
 def test_sfu_ops():
     boilerplate_sfu_ops(['recip','exp','sin'], lambda x: x)
