@@ -12,19 +12,8 @@ class AssembleError(Exception):
 class Assembly(list):
 
     def __init__(self, *args, **kwargs):
-
         super().__init__(*args, **kwargs)
-
-        # name : index
         self.labels = {}
-
-    def finalize(self):
-        for idx, insn in enumerate(self):
-            if isinstance(insn, Branch):
-                if insn.addr_label is not None:
-                    idx_addr = self.labels[insn.addr_label]
-                    insn.addr = int_to_uint((idx_addr - idx - 4) * 8)
-            insn.finalize()
 
 
 class Label(object):
@@ -38,10 +27,17 @@ class Label(object):
         self.asm.labels[name] = len(self.asm)
 
 
-class Reference(str):
+class Reference(object):
+
+    def __init__(self, asm, name=None):
+        self.asm = asm
+        self.name = name
 
     def __getattr__(self, name):
-        return name
+        return Reference(self.asm, name)
+
+    def __int__(self):
+        return self.asm.labels[self.name]
 
 
 class Register(object):
@@ -247,11 +243,8 @@ class Instruction(object):
         REGISTERS[f'rf{i}'] = Register(f'rf{i}', 0, i)
 
     def __init__(self, asm, *args, **kwargs):
+        self.serial = len(asm)
         asm.append(self)
-        self.finalized = False
-
-    def finalize(self):
-        self.finalized = True
 
 
 class ALUConditions(object):
@@ -836,17 +829,22 @@ class Branch(Instruction):
         self.raddr_a = None
         self.addr_label = None
 
-        if src.startswith('rf'):
+        self.addr = None
+
+        if isinstance(src, Register) and src.name.startswith('rf'):
             self.bdi = 3
             self.raddr_a = int(src[2:])
-        else:
+        elif isinstance(src, Reference):
             # Branch to label
             self.bdi = 1
             self.addr_label = src
+        else:
+            raise "TODO"
 
     def __int__(self):
-        if not self.finalized:
-            raise ValueError('Not yet finalized')
+
+        if self.addr_label is not None:
+            addr = int_to_uint((int(self.addr_label) - self.serial - 4) * 8)
 
         cond_br = {
             'always': 0,
@@ -860,9 +858,9 @@ class Branch(Instruction):
 
         return 0 \
             | (0b10 << 56) \
-            | (((self.addr & ((1 << 24) - 1)) >> 3) << 35) \
+            | (((addr & ((1 << 24) - 1)) >> 3) << 35) \
             | (cond_br << 32) \
-            | ((self.addr >> 24) << 24) \
+            | ((addr >> 24) << 24) \
             | (self.bdi << 12) \
             | ((self.raddr_a if self.raddr_a is not None else 0) << 6)
 
@@ -896,7 +894,7 @@ def qpu(func):
         g = func.__globals__
         g_orig = g.copy()
         g['L'] = Label(asm)
-        g['R'] = Reference()
+        g['R'] = Reference(asm)
         g['b'] = functools.partial(Branch, asm, 'b')
         for mul_op in MulALUOp.OPERATIONS.keys():
             g[mul_op] = functools.partial(ALU, asm, mul_op)
