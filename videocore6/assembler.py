@@ -1,7 +1,5 @@
 
-import struct
 import functools
-import numpy as np
 from videocore6 import float_to_int, int_to_float, int_to_uint
 
 
@@ -69,11 +67,13 @@ class Register(object):
         self.unpack_bits = Register.INPUT_MODIFIER[unpack]
 
     def pack(self, modifier):
-        assert self.pack_bits == Register.OUTPUT_MODIFIER['none']
+        if self.pack_bits != Register.OUTPUT_MODIFIER['none']:
+            raise AssembleError('Conflict pack')
         return Register(self.name, self.magic, self.waddr, pack=modifier)
 
     def unpack(self, modifier):
-        assert self.unpack_bits == Register.INPUT_MODIFIER['none']
+        if self.unpack_bits != Register.INPUT_MODIFIER['none']:
+            raise AssembleError('Conflict unpack')
         return Register(self.name, self.magic, self.waddr, unpack=modifier)
 
 
@@ -105,11 +105,11 @@ class Signals(set):
     def add(self, sigs):
         if isinstance(sigs, WriteSignal):
             sig = sigs
-            raise AssembleError('"{}" requires destination register (ex. "{}(r0)")'.format(sig.name, sig.name))
+            raise AssembleError(f'"{sig}" requires destination register (ex. "{sig}(r0)")')
         elif isinstance(sigs, Signal):
             sig = sigs
             if sig.name in [s.name for s in self]:
-                raise AssembleError('Signal "{}" is duplicated'.format(sig.name))
+                raise AssembleError(f'Signal "{sig}" is duplicated')
             super(Signals, self).add(sig)
             if len([s.dst for s in self if s.dst is not None]) > 1:
                 raise AssembleError('Too many signals that require destination register')
@@ -246,6 +246,12 @@ class Instruction(object):
         self.serial = len(asm)
         asm.append(self)
 
+    def __int__(self):
+        return self.pack()
+
+    def pack(self):
+        assert False, 'Bug: Not implemented'
+
 
 class ALUConditions(object):
 
@@ -297,13 +303,14 @@ class ALUConditions(object):
 
         result = [
             #     none | add_insn | add_push | add_update
-            [0, 0b0100000,         0,         0],  # none
+            [0b0000000, 0b0100000, 0b0000000, 0b0000000],  # none
             [0b0110000, 0b1000000, 0b0110000, 0b1000000],  # mul_insn
             [0b0010000, 0b0100000,      None,      None],  # mul_push
             [0b0010000,      None,      None,      None],  # mul_update
         ][mul_cond][add_cond]
 
-        assert(result is not None)
+        if result is None:
+            raise AssembleError(f'Conflict conditional flags "{self.cond_add}" and "{self.cond_mul}"')
 
         if add_push > 0:
             result |= conds_push[self.cond_add]
@@ -472,20 +479,20 @@ class ALUOp(object):
             self.mux_a = self.MUX_A[self.name]
         else:
             if self.src1 is None:
-                raise "TODO: Require src1"
+                raise AssembleError(f'"{self.name}" requires src1')
             if not isinstance(self.src1, (int, float, Register)):
-                raise "TODO: Invalid src object"
+                raise AssembleError(f'Invalid src1 object')
 
         if self.name in self.MUX_B:
             self.mux_b = self.MUX_B[self.name]
         else:
             if self.src2 is None:
-                raise "TODO: Require src2"
+                raise AssembleError(f'"{self.name}" requires src2')
             if not isinstance(self.src2, (int, float, Register)):
-                raise "TODO: Invalid src object"
+                raise AssembleError(f'Invalid src2 object')
 
     def pack(self, raddr):
-        assert False, 'Bug: not implemented'
+        assert False, 'Bug: Not implemented'
 
 
 class AddALUOp(ALUOp):
@@ -515,7 +522,8 @@ class AddALUOp(ALUOp):
 
         if self.name in ['fround', 'ftrunc', 'ffloor', 'fceil', 'fdx', 'fdy']:
 
-            assert self.src1.unpack_bits != Register.INPUT_MODIFIER['abs'], "'abs' unpacking is not allowed here."
+            if self.src1.unpack_bits == Register.INPUT_MODIFIER['abs']:
+                raise AssembleError('"abs" unpacking is not allowed here')
 
             mux_b |= self.dst.pack_bits
             a_unpack = self.src1.unpack_bits[0] if isinstance(self.src1, Register) else Register.INPUT_MODIFIER['none'][0]
@@ -523,8 +531,10 @@ class AddALUOp(ALUOp):
 
         if self.name in ['ftoin', 'ftoiz', 'ftouz', 'ftoc']:
 
-            assert self.dst.pack_bits == Register.OUTPUT_MODIFIER['none'], "packing is not allowed here."
-            assert self.src1.unpack_bits != Register.INPUT_MODIFIER['abs'], "'abs' unpacking is not allowed here."
+            if self.dst.pack_bits != Register.OUTPUT_MODIFIER['none']:
+                raise AssembleError('packing is not allowed here')
+            if self.src1.unpack_bits == Register.INPUT_MODIFIER['abs']:
+                raise AssembleError('"abs" unpacking is not allowed here')
 
             a_unpack = self.src1.unpack_bits[0] if isinstance(self.src1, Register) else Register.INPUT_MODIFIER['none'][0]
             op &= ~0b1100
@@ -776,21 +786,18 @@ class ALU(Instruction):
             self.add_op = AddALUOp('nop')
             self.mul_op = MulALUOp(opr, *args, **kwargs)
         else:
-            raise "TODO"
+            raise AssembleError(f'"{opr}" is unknown operation')
 
     def dual_issue(self, opr, *args, **kwargs):
         if self.mul_op is not None:
-            raise "TODO"
+            raise AssembleError('Conflict MulALU operation')
         self.mul_op = MulALUOp(opr, *args, **kwargs)
         return None
 
     def __getattr__(self, name):
         if name in MulALUOp.OPERATIONS:
             return functools.partial(self.dual_issue, name)
-        raise "TODO"
-
-    def __int__(self):
-        return self.pack()
+        raise AssembleError(f'"{name}" is not MulALU operation')
 
     def pack(self):
         add_op = self.add_op
@@ -839,9 +846,9 @@ class Branch(Instruction):
             self.bdi = 1
             self.addr_label = src
         else:
-            raise "TODO"
+            raise AssembleError('Invalid src object')
 
-    def __int__(self):
+    def pack(self):
 
         if self.addr_label is not None:
             addr = int_to_uint((int(self.addr_label) - self.serial - 4) * 8)
@@ -909,7 +916,7 @@ def qpu(func):
         for alias_op in _alias_ops:
             g[alias_op.__name__] = functools.partial(alias_op, asm)
         for name, sig in Instruction.SIGNALS.items():
-            if name != 'smimm':  # smimm signal is automatically inserted
+            if name != 'smimm':  # smimm signal is automatically derived
                 g[name] = sig
         func(asm, *args, **kwargs)
         g.clear()
