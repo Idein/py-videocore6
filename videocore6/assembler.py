@@ -787,19 +787,27 @@ class ALU(Instruction):
             self.mul_op = MulALUOp(opr, *args, **kwargs)
         else:
             raise AssembleError(f'"{opr}" is unknown operation')
+        self.repack()
 
     def dual_issue(self, opr, *args, **kwargs):
         if self.mul_op is not None:
             raise AssembleError('Conflict MulALU operation')
         self.mul_op = MulALUOp(opr, *args, **kwargs)
-        return None
+        self.repack()
 
     def __getattr__(self, name):
         if name in MulALUOp.OPERATIONS:
             return functools.partial(self.dual_issue, name)
         raise AssembleError(f'"{name}" is not MulALU operation')
 
+    def repack(self):
+        self.pack_result = None
+        self.pack_result = self.pack()
+
     def pack(self):
+        if self.pack_result is not None:
+            return self.pack_result
+
         add_op = self.add_op
         mul_op = self.mul_op
         if mul_op is None:
@@ -832,7 +840,16 @@ class Branch(Instruction):
     def __init__(self, asm, opr, src, *, cond):
         super(Branch, self).__init__(asm)
 
-        self.cond_br = cond
+        self.cond_name = cond
+        self.cond_br = {
+            'always': 0,
+            'a0': 2,
+            'na0': 3,
+            'alla': 4,
+            'anyna': 5,
+            'anya': 6,
+            'allna': 7,
+        }[self.cond_name]
         self.raddr_a = None
         self.addr_label = None
 
@@ -853,20 +870,10 @@ class Branch(Instruction):
         if self.addr_label is not None:
             addr = int_to_uint((int(self.addr_label) - self.serial - 4) * 8)
 
-        cond_br = {
-            'always': 0,
-            'a0': 2,
-            'na0': 3,
-            'alla': 4,
-            'anyna': 5,
-            'anya': 6,
-            'allna': 7,
-        }[self.cond_br]
-
         return 0 \
             | (0b10 << 56) \
             | (((addr & ((1 << 24) - 1)) >> 3) << 35) \
-            | (cond_br << 32) \
+            | (self.cond_br << 32) \
             | ((addr >> 24) << 24) \
             | (self.bdi << 12) \
             | ((self.raddr_a if self.raddr_a is not None else 0) << 6)
