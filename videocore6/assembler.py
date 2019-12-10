@@ -20,11 +20,11 @@ class Assembly(list):
 
     def finalize(self):
         for idx, insn in enumerate(self):
-            if insn.insn_type == 'branch':
+            if isinstance(insn, Branch):
                 if insn.addr_label is not None:
                     idx_addr = self.labels[insn.addr_label]
                     insn.addr = int_to_uint((idx_addr - idx - 4) * 8)
-            insn.finalized = True
+            insn.finalize()
 
 
 class Label(object):
@@ -123,7 +123,7 @@ class Signals(set):
         else:
             raise AssembleError('Invalid signal object')
 
-    def __int__(self):
+    def pack(self):
         return {
             frozenset(): 0,
             frozenset(['thrsw']): 1,
@@ -152,7 +152,7 @@ class Signals(set):
             frozenset(['ldunifa']): 24,
             frozenset(['ldunifarf']): 25,
             frozenset(['smimm', 'ldtmu']): 31,
-        }[frozenset([sig.name for sig in self])]
+        }[frozenset([sig.name for sig in self])] << 53
 
     def is_write(self):
         return any([sig.is_write() for sig in self])
@@ -246,7 +246,319 @@ class Instruction(object):
     for i in range(64):
         REGISTERS[f'rf{i}'] = Register(f'rf{i}', 0, i)
 
-    add_ops = {
+    def __init__(self, asm, *args, **kwargs):
+        asm.append(self)
+        self.finalized = False
+
+    def finalize(self):
+        self.finalized = True
+
+
+class ALUConditions(object):
+
+    def __init__(self, cond_add, cond_mul):
+        self.cond_add = cond_add
+        self.cond_mul = cond_mul
+
+    def pack(self, sigs):
+
+        if sigs.is_write():
+            return sigs.write_address() << 46
+
+        conds_push = {
+            'pushz': 1,
+            'pushn': 2,
+            'pushc': 3,
+        }
+        conds_update = {
+            'andz': 4,
+            'andnz': 5,
+            'nornz': 6,
+            'norz': 7,
+            'andn': 8,
+            'andnn': 9,
+            'nornn': 10,
+            'norn': 11,
+            'andc': 12,
+            'andnc': 13,
+            'nornc': 14,
+            'norc': 15,
+        }
+        conds_insn = {
+            'ifa': 0,
+            'ifb': 1,
+            'ifna': 2,
+            'ifnb': 3,
+        }
+
+        add_insn = 1 * int(self.cond_add in conds_insn.keys())
+        add_push = 2 * int(self.cond_add in conds_push.keys())
+        add_update = 3 * int(self.cond_add in conds_update.keys())
+
+        mul_insn = 1 * int(self.cond_mul in conds_insn.keys())
+        mul_push = 2 * int(self.cond_mul in conds_push.keys())
+        mul_update = 3 * int(self.cond_mul in conds_update.keys())
+
+        add_cond = add_insn + add_push + add_update
+        mul_cond = mul_insn + mul_push + mul_update
+
+        result = [
+            #     none | add_insn | add_push | add_update
+            [0, 0b0100000,         0,         0],  # none
+            [0b0110000, 0b1000000, 0b0110000, 0b1000000],  # mul_insn
+            [0b0010000, 0b0100000,      None,      None],  # mul_push
+            [0b0010000,      None,      None,      None],  # mul_update
+        ][mul_cond][add_cond]
+
+        assert(result is not None)
+
+        if add_push > 0:
+            result |= conds_push[self.cond_add]
+        if mul_push > 0:
+            result |= conds_push[self.cond_mul]
+        if add_update > 0:
+            result |= conds_update[self.cond_add]
+        if mul_update > 0:
+            result |= conds_update[self.cond_mul]
+        if mul_insn > 0:
+            if add_insn > 0:
+                result |= conds_insn[self.cond_mul] << 4
+                result |= conds_insn[self.cond_add]
+            elif add_update > 0:
+                result |= conds_insn[self.cond_mul] << 4
+            else:
+                result |= conds_insn[self.cond_mul] << 2
+        elif add_insn > 0:
+            result |= conds_insn[self.cond_add] << 2
+
+        return result << 46
+
+
+class ALURaddrs(object):
+
+    def __init__(self):
+        self.a = None
+        self.b = None
+
+    def has_smimm(self):
+        return isinstance(self.b, (int, float))
+
+    def determine_mux(self, op_mux, regs):
+
+        reg_a, reg_b = regs
+        mux_a, mux_b = op_mux
+
+        assert (mux_a is None and isinstance(reg_a, (int, float, Register))) or (mux_a is not None and reg_a is None)
+        assert (mux_b is None and isinstance(reg_b, (int, float, Register))) or (mux_b is not None and reg_b is None)
+        assert (mux_a is not None and mux_b is not None) or (mux_a is None)
+
+        def _to_mux(reg):
+
+            if isinstance(reg, (int, float)):
+                assert reg == self.b, f'Bug: small immediate {reg} is not added yet'
+                return 7
+            elif isinstance(reg, Register):
+                if reg.magic == 0:
+                    if isinstance(self.a, Register) and self.a.name == reg.name:
+                        return 6
+                    if isinstance(self.b, Register) and self.b.name == reg.name:
+                        return 7
+                    assert reg == self.b, f'Bug: register {reg} is not added yet'
+                elif reg.waddr < 6:
+                    return reg.waddr
+                else:
+                    assert reg == self.b, f'Bug: register {reg} should be failed to added'
+            else:
+                assert False, 'Bug: Type error'
+
+        if mux_a is None:
+            mux_a = _to_mux(reg_a)
+        if mux_b is None:
+            mux_b = _to_mux(reg_b)
+
+        return mux_a, mux_b
+
+    def add(self, reg):
+
+        if reg is None:
+            return
+
+        assert isinstance(reg, (int, float, Register)), 'Bug: Type error'
+
+        if isinstance(reg, (int, float)):
+            # small immediate should be b
+            if self.b is None:
+                self.b = reg
+            elif self.b == reg:
+                pass
+            else:
+                if isinstance(self.b, (int, float)):
+                    raise AssembleError(f'Conflict small immediates {self.b} and small immediates {reg}')
+                elif isinstance(self.b, Register):
+                    raise AssembleError(f'Conflict register {self.b} and small immediates {reg}')
+                else:
+                    assert False, 'Bug: Lack of type exhaustivity'
+        else:
+            # both ok
+
+            # already exist
+            if self.a is not None:
+                if self.a.name == reg.name:
+                    return
+            if self.b is not None and isinstance(self.b, Register):
+                if self.b.name == reg.name:
+                    return
+
+            # not yet
+            if reg.magic == 0:
+                if self.a is None:
+                    self.a = reg
+                    return
+                elif self.b is None:
+                    self.b = reg
+                    return
+                else:
+                    raise AssembleError('Too many register files read')
+            elif reg.waddr < 6:
+                return
+            else:
+                raise AssembleError(f'Invalid source register {reg}')
+
+    def pack(self):
+        raddr_a, raddr_b = 0, 0
+
+        if isinstance(self.a, Register):
+            raddr_a = self.a.waddr
+
+        if isinstance(self.b, int):
+            smimms_int = {}
+            for i in range(16):
+                smimms_int[i] = i
+                smimms_int[i - 16] = i + 16
+                smimms_int[float_to_int(2 ** (i - 8))] = i + 32
+            raddr_b = smimms_int[self.b]
+        if isinstance(self.b, float):
+            smimms_float = {}
+            for i in range(16):
+                # Denormal numbers
+                smimms_float[int_to_float(i)] = i
+                smimms_float[2 ** (i - 8)] = i + 32
+            raddr_b = smimms_float[self.b]
+        if isinstance(self.b, Register):
+            raddr_b = self.b.waddr
+
+        return 0 \
+            | (raddr_a << 6) \
+            | (raddr_b << 0)
+
+
+class ALUOp(object):
+
+    OPERATIONS = {}
+    MUX_A = {}
+    MUX_B = {}
+
+    def __init__(self, opr, dst=Instruction.REGISTERS['null'], src1=None, src2=None, cond=None, sig=None):
+
+        assert opr in self.OPERATIONS
+
+        self.name = opr
+        self.op = self.OPERATIONS[opr]
+        self.dst = dst
+        self.src1 = src1
+        self.src2 = src2
+        self.cond = cond
+        self.sigs = Signals()
+        if sig is not None:
+            self.sigs.add(sig)
+
+        self.mux_a = None
+        self.mux_b = None
+
+        if self.name in self.MUX_A:
+            self.mux_a = self.MUX_A[self.name]
+        else:
+            if self.src1 is None:
+                raise "TODO: Require src1"
+            if not isinstance(self.src1, (int, float, Register)):
+                raise "TODO: Invalid src object"
+
+        if self.name in self.MUX_B:
+            self.mux_b = self.MUX_B[self.name]
+        else:
+            if self.src2 is None:
+                raise "TODO: Require src2"
+            if not isinstance(self.src2, (int, float, Register)):
+                raise "TODO: Invalid src object"
+
+    def pack(self, raddr):
+        assert False, 'Bug: not implemented'
+
+
+class AddALUOp(ALUOp):
+
+    def __init__(self, opr, *args, **kwargs):
+        super(AddALUOp, self).__init__(opr, *args, **kwargs)
+
+    def pack(self, raddr):
+
+        op = self.op
+        mux_a, mux_b = raddr.determine_mux((self.mux_a, self.mux_b), (self.src1, self.src2))
+
+        if self.name in ['fadd', 'faddnf', 'fsub', 'fmax', 'fmin', 'fcmp']:
+
+            op |= self.dst.pack_bits << 4
+
+            a_unpack = self.src1.unpack_bits[0] if isinstance(self.src1, Register) else Register.INPUT_MODIFIER['none'][0]
+            b_unpack = self.src2.unpack_bits[0] if isinstance(self.src2, Register) else Register.INPUT_MODIFIER['none'][0]
+
+            ordering = a_unpack * 8 + mux_a > b_unpack * 8 + mux_b
+            if (self.name in ['fmin', 'fadd'] and ordering) or (self.name in ['fmax', 'faddnf'] and not ordering):
+                a_unpack, b_unpack = b_unpack, a_unpack
+                mux_a, mux_b = mux_b, mux_a
+
+            op |= a_unpack << 2
+            op |= b_unpack << 0
+
+        if self.name in ['fround', 'ftrunc', 'ffloor', 'fceil', 'fdx', 'fdy']:
+
+            assert self.src1.unpack_bits != Register.INPUT_MODIFIER['abs'], "'abs' unpacking is not allowed here."
+
+            mux_b |= self.dst.pack_bits
+            a_unpack = self.src1.unpack_bits[0] if isinstance(self.src1, Register) else Register.INPUT_MODIFIER['none'][0]
+            op = (op & ~(1 << 2)) | a_unpack << 2
+
+        if self.name in ['ftoin', 'ftoiz', 'ftouz', 'ftoc']:
+
+            assert self.dst.pack_bits == Register.OUTPUT_MODIFIER['none'], "packing is not allowed here."
+            assert self.src1.unpack_bits != Register.INPUT_MODIFIER['abs'], "'abs' unpacking is not allowed here."
+
+            a_unpack = self.src1.unpack_bits[0] if isinstance(self.src1, Register) else Register.INPUT_MODIFIER['none'][0]
+            op &= ~0b1100
+            op |= a_unpack << 2
+
+        if self.name in ['vfpack']:
+
+            a_unpack = self.src1.unpack_bits[0] if isinstance(self.src1, Register) else Register.INPUT_MODIFIER['none'][0]
+            b_unpack = self.src2.unpack_bits[0] if isinstance(self.src2, Register) else Register.INPUT_MODIFIER['none'][0]
+
+            op &= ~0b101
+            op |= a_unpack << 2
+            op |= b_unpack
+
+        if self.name in ['vfmin', 'vfmax']:
+
+            a_unpack = self.src1.unpack_bits[1] if isinstance(self.src1, Register) else Register.INPUT_MODIFIER['none'][1]
+            op |= a_unpack
+
+        return 0 \
+            | (self.dst.magic << 44) \
+            | (self.dst.waddr << 32) \
+            | (op << 24) \
+            | (mux_b << 15) \
+            | (mux_a << 12)
+
+    OPERATIONS = {
         # FADD is FADDNF depending on the order of the mux_a/mux_b.
         'fadd': 0,
         'faddnf': 0,
@@ -328,7 +640,7 @@ class Instruction(object):
         'utof': 252,
     }
 
-    add_op_mux_a = {
+    MUX_A = {
         'nop': 0,
         'tidx': 1,
         'eidx': 2,
@@ -347,7 +659,7 @@ class Instruction(object):
         'vpmwt': 6,
     }
 
-    add_op_mux_b = {
+    MUX_B = {
         'bnot': 0,
         'neg': 1,
         'flapush': 2,
@@ -396,7 +708,46 @@ class Instruction(object):
         'utof': 4,
     }
 
-    mul_ops = {
+
+class MulALUOp(ALUOp):
+
+    def __init__(self, opr, *args, **kwargs):
+        super(MulALUOp, self).__init__(opr, *args, **kwargs)
+
+    def pack(self, raddr):
+
+        op = self.op
+        mux_a, mux_b = raddr.determine_mux((self.mux_a, self.mux_b), (self.src1, self.src2))
+
+        if self.name in ['vfmul']:
+
+            a_unpack = self.src1.unpack_bits[1] if isinstance(self.src1, Register) else Register.INPUT_MODIFIER['none'][1]
+            op += a_unpack
+
+        if self.name in ['fmul']:
+
+            a_unpack = self.src1.unpack_bits[0] if isinstance(self.src1, Register) else Register.INPUT_MODIFIER['none'][0]
+            b_unpack = self.src2.unpack_bits[0] if isinstance(self.src2, Register) else Register.INPUT_MODIFIER['none'][0]
+
+            op += self.dst.pack_bits << 4
+            op |= a_unpack << 2
+            op |= b_unpack << 0
+
+        if self.name in ['fmov']:
+
+            a_unpack = self.src1.unpack_bits[0] if isinstance(self.src1, Register) else 0
+
+            op |= (self.dst.pack_bits >> 1) & 1
+            mux_b = ((self.dst.pack_bits & 1) << 2) | a_unpack
+
+        return 0 \
+            | (op << 58) \
+            | (self.dst.magic << 45) \
+            | (self.dst.waddr << 38) \
+            | (mux_b << 21) \
+            | (mux_a << 18)
+
+    OPERATIONS = {
         'add': 1,
         'sub': 2,
         'umul24': 3,
@@ -409,123 +760,95 @@ class Instruction(object):
         'fmul': 16,
     }
 
-    mul_op_mux_a = {
+    MUX_A = {
         'nop': 0,
     }
 
-    mul_op_mux_b = {
+    MUX_B = {
         'nop': 4,
         'mov': 7,
         'fmov': 0,
     }
 
-    # Don't ask me why...
-    def sig_to_num(self):
-        sigs = {
-            frozenset(): 0,
-            frozenset(['thrsw']): 1,
-            frozenset(['ldunif']): 2,
-            frozenset(['thrsw', 'ldunif']): 3,
-            frozenset(['ldtmu']): 4,
-            frozenset(['thrsw', 'ldtmu']): 5,
-            frozenset(['ldtmu', 'ldunif']): 6,
-            frozenset(['thrsw', 'ldtmu', 'ldunif']): 7,
-            frozenset(['ldvary']): 8,
-            frozenset(['thrsw', 'ldvary']): 9,
-            frozenset(['ldvary', 'ldunif']): 10,
-            frozenset(['thrsw', 'ldvary', 'ldunif']): 11,
-            frozenset(['ldunifrf']): 12,
-            frozenset(['thrsw', 'ldunifrf']): 13,
-            frozenset(['smimm', 'ldvary']): 14,
-            frozenset(['smimm']): 15,
-            frozenset(['ldtlb']): 16,
-            frozenset(['ldtlbu']): 17,
-            frozenset(['wrtmuc']): 18,
-            frozenset(['thrsw', 'wrtmuc']): 19,
-            frozenset(['ldvary', 'wrtmuc']): 20,
-            frozenset(['thrsw', 'ldvary', 'wrtmuc']): 21,
-            frozenset(['ucb']): 22,
-            frozenset(['rot']): 23,
-            frozenset(['ldunifa']): 24,
-            frozenset(['ldunifarf']): 25,
-            frozenset(['smimm', 'ldtmu']): 31,
-        }
-        return sigs[frozenset(self.sig)]
 
-    def cond_to_num(self):
-        if self.sig.is_write():
-            return self.sig.write_address()
+class ALU(Instruction):
 
-        conds_push = {
-            'pushz': 1,
-            'pushn': 2,
-            'pushc': 3,
-        }
-        conds_update = {
-            'andz': 4,
-            'andnz': 5,
-            'nornz': 6,
-            'norz': 7,
-            'andn': 8,
-            'andnn': 9,
-            'nornn': 10,
-            'norn': 11,
-            'andc': 12,
-            'andnc': 13,
-            'nornc': 14,
-            'norc': 15,
-        }
-        conds_insn = {
-            'ifa': 0,
-            'ifb': 1,
-            'ifna': 2,
-            'ifnb': 3,
-        }
+    def __init__(self, asm, opr, *args, **kwargs):
+        super(ALU, self).__init__(asm)
 
-        add_insn = 1 * int(self.cond_add in conds_insn.keys())
-        add_push = 2 * int(self.cond_add in conds_push.keys())
-        add_update = 3 * int(self.cond_add in conds_update.keys())
+        if opr in AddALUOp.OPERATIONS:
+            self.add_op = AddALUOp(opr, *args, **kwargs)
+            self.mul_op = None
+        elif opr in MulALUOp.OPERATIONS:
+            self.add_op = AddALUOp('nop')
+            self.mul_op = MulALUOp(opr, *args, **kwargs)
+        else:
+            raise "TODO"
 
-        mul_insn = 1 * int(self.cond_mul in conds_insn.keys())
-        mul_push = 2 * int(self.cond_mul in conds_push.keys())
-        mul_update = 3 * int(self.cond_mul in conds_update.keys())
+    def dual_issue(self, opr, *args, **kwargs):
+        if self.mul_op is not None:
+            raise "TODO"
+        self.mul_op = MulALUOp(opr, *args, **kwargs)
+        return None
 
-        add_cond = add_insn + add_push + add_update
-        mul_cond = mul_insn + mul_push + mul_update
+    def __getattr__(self, name):
+        if name in MulALUOp.OPERATIONS:
+            return functools.partial(self.dual_issue, name)
+        raise "TODO"
 
-        result = [
-            #     none | add_insn | add_push | add_update
-            [0, 0b0100000,         0,         0],  # none
-            [0b0110000, 0b1000000, 0b0110000, 0b1000000],  # mul_insn
-            [0b0010000, 0b0100000,      None,      None],  # mul_push
-            [0b0010000,      None,      None,      None],  # mul_update
-        ][mul_cond][add_cond]
+    def __int__(self):
+        return self.pack()
 
-        assert(result is not None)
+    def pack(self):
+        add_op = self.add_op
+        mul_op = self.mul_op
+        if mul_op is None:
+            mul_op = MulALUOp('nop')
 
-        if add_push > 0:
-            result |= conds_push[self.cond_add]
-        if mul_push > 0:
-            result |= conds_push[self.cond_mul]
-        if add_update > 0:
-            result |= conds_update[self.cond_add]
-        if mul_update > 0:
-            result |= conds_update[self.cond_mul]
-        if mul_insn > 0:
-            if add_insn > 0:
-                result |= conds_insn[self.cond_mul] << 4
-                result |= conds_insn[self.cond_add]
-            elif add_update > 0:
-                result |= conds_insn[self.cond_mul] << 4
-            else:
-                result |= conds_insn[self.cond_mul] << 2
-        elif add_insn > 0:
-            result |= conds_insn[self.cond_add] << 2
+        raddr = ALURaddrs()
+        raddr.add(add_op.src1)
+        raddr.add(add_op.src2)
+        raddr.add(mul_op.src1)
+        raddr.add(mul_op.src2)
 
-        return result
+        sigs = Signals()
+        sigs.add(add_op.sigs)
+        sigs.add(mul_op.sigs)
+        if raddr.has_smimm():
+            sigs.add(Instruction.SIGNALS['smimm'])
 
-    def cond_br_to_num(self):
-        return {
+        cond = ALUConditions(add_op.cond, mul_op.cond)
+
+        return 0 \
+            | sigs.pack() \
+            | cond.pack(sigs) \
+            | add_op.pack(raddr) \
+            | mul_op.pack(raddr) \
+            | raddr.pack()
+
+
+class Branch(Instruction):
+
+    def __init__(self, asm, opr, src, *, cond):
+        super(Branch, self).__init__(asm)
+
+        self.cond_br = cond
+        self.raddr_a = None
+        self.addr_label = None
+
+        if src.startswith('rf'):
+            self.bdi = 3
+            self.raddr_a = int(src[2:])
+        else:
+            # Branch to label
+            self.bdi = 1
+            self.addr_label = src
+
+    def __int__(self):
+        if not self.finalized:
+            raise ValueError('Not yet finalized')
+
+        cond_br = {
             'always': 0,
             'a0': 2,
             'na0': 3,
@@ -535,289 +858,13 @@ class Instruction(object):
             'allna': 7,
         }[self.cond_br]
 
-    def __init__(self, asm, opr, *args, **kwargs):
-        asm.append(self)
-
-        self.insn_type = 'alu'
-        self.finalized = False
-
-        self.sig = Signals()
-
-        self.cond_add = None
-        self.cond_mul = None
-
-        self.op_add = self.add_ops['nop']
-        self.ma = Instruction.REGISTERS['null'].magic
-        self.waddr_a = Instruction.REGISTERS['null'].waddr
-        self.add_a = self.add_op_mux_a['nop']
-        self.add_b = self.add_op_mux_b['nop']
-
-        self.op_mul = self.mul_ops['nop']
-        self.mm = Instruction.REGISTERS['null'].magic
-        self.waddr_m = Instruction.REGISTERS['null'].waddr
-        self.mul_a = self.mul_op_mux_a['nop']
-        self.mul_b = self.mul_op_mux_b['nop']
-
-        self.raddr_a = None
-        self.raddr_b = None
-
-        self.addr = 0
-        self.addr_label = None
-
-        if opr in self.add_ops:
-            AddALU(self, opr, *args, **kwargs)
-        elif opr == 'b':
-            Branch(self, opr, *args, **kwargs)
-
-    def __getattr__(self, name):
-        if self.insn_type == 'alu' and name in Instruction.mul_ops.keys():
-            return functools.partial(MulALU, self, name)
-        else:
-            raise AttributeError(name)
-
-    def __int__(self):
-        if not self.finalized:
-            raise ValueError('Not yet finalized')
-        if self.insn_type == 'alu':
-            return (self.op_mul << 58) \
-                | (int(self.sig) << 53) \
-                | (self.cond_to_num() << 46) \
-                | (self.mm << 45) \
-                | (self.ma << 44) \
-                | (self.waddr_m << 38) \
-                | (self.waddr_a << 32) \
-                | (self.op_add << 24) \
-                | (self.mul_b << 21) \
-                | (self.mul_a << 18) \
-                | (self.add_b << 15) \
-                | (self.add_a << 12) \
-                | ((self.raddr_a if self.raddr_a is not None else 0) << 6) \
-                | ((self.raddr_b if self.raddr_b is not None else 0) << 0)
-        elif self.insn_type == 'branch':
-            return (0b10 << 56) \
-                | (((self.addr & ((1 << 24) - 1)) >> 3) << 35) \
-                | (self.cond_br_to_num() << 32) \
-                | ((self.addr >> 24) << 24) \
-                | (self.bdi << 12) \
-                | ((self.raddr_a if self.raddr_a is not None else 0) << 6)
-
-
-class ALU(object):
-
-    # XXX: Type-strict dictionary
-
-    smimms_int = {}
-    for i in range(16):
-        smimms_int[i] = i
-        smimms_int[i - 16] = i + 16
-        smimms_int[float_to_int(2 ** (i - 8))] = i + 32
-
-    smimms_float = {}
-    for i in range(16):
-        # Denormal numbers
-        smimms_float[int_to_float(i)] = i
-        smimms_float[2 ** (i - 8)] = i + 32
-
-    def manage_src(self, insn, src):
-
-        is_smimm_int = isinstance(src, int)
-        is_smimm_float = isinstance(src, float)
-
-        if is_smimm_int or is_smimm_float:
-            if is_smimm_int:
-                rb = self.smimms_int[src]
-            elif is_smimm_float:
-                rb = self.smimms_float[src]
-            if insn.raddr_b is None:
-                insn.raddr_b = rb
-                insn.sig.add(Instruction.SIGNALS['smimm'])
-            else:
-                if Instruction.SIGNALS['smimm'] not in insn.sig:
-                    raise AssembleError('Too many requests for raddr_b')
-                elif insn.raddr_b != rb:
-                    raise AssembleError('Small immediates conflict')
-            return 7
-
-        if src.magic == 0:
-            idx = src.waddr
-            assert 0 <= idx <= 63
-            if insn.raddr_a in [None, idx]:
-                insn.raddr_a = idx
-                return 6
-            elif Instruction.SIGNALS['smimm'] not in insn.sig and insn.raddr_b in [None, idx]:
-                insn.raddr_b = idx
-                return 7
-            else:
-                raise AssembleError('Too many register files read')
-        elif src.waddr < 6:
-            return src.waddr
-        else:
-            raise AssembleError(f'Unknown source register {src}')
-
-    def __init__(self, insn, opr, dst=Instruction.REGISTERS['null'], src1=None,
-                 src2=None, cond=None, sig=None):
-        # XXX: With Python >= 3.8 we can use positional-only params.
-        if src1 is None and src2 is not None:
-            raise AssembleError('src2 is specified while src1 is not')
-
-        insn.insn_type = 'alu'
-
-        if sig is not None:
-            insn.sig.add(sig)
-
-        self.cond = cond
-
-        self.op = self.ops[opr]
-
-        self.magic = dst.magic
-        self.waddr = dst.waddr
-
-        if src1 is None:
-            self.mux_a = self.op_mux_a[opr]
-        else:
-            self.mux_a = self.manage_src(insn, src1)
-
-        if src2 is None:
-            self.mux_b = self.op_mux_b[opr]
-        else:
-            self.mux_b = self.manage_src(insn, src2)
-
-        if opr in ['fadd', 'faddnf', 'fsub', 'fmax', 'fmin', 'fcmp']:
-
-            self.op |= dst.pack_bits << 4
-
-            a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else Register.INPUT_MODIFIER['none'][0]
-            b_unpack = src2.unpack_bits[0] if isinstance(src2, Register) else Register.INPUT_MODIFIER['none'][0]
-
-            ordering = a_unpack * 8 + self.mux_a > b_unpack * 8 + self.mux_b
-            if (opr in ['fmin', 'fadd'] and ordering) or (opr in ['fmax', 'faddnf'] and not ordering):
-                a_unpack, b_unpack = b_unpack, a_unpack
-                self.mux_a, self.mux_b = self.mux_b, self.mux_a
-
-            self.op |= a_unpack << 2
-            self.op |= b_unpack << 0
-
-        if opr in ['fround', 'ftrunc', 'ffloor', 'fceil', 'fdx', 'fdy']:
-
-            assert src1.unpack_bits != Register.INPUT_MODIFIER['abs'], "'abs' unpacking is not allowed here."
-
-            self.mux_b |= dst.pack_bits
-            a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else Register.INPUT_MODIFIER['none'][0]
-            self.op = (self.op & ~(1 << 2)) | a_unpack << 2
-
-        if opr in ['ftoin', 'ftoiz', 'ftouz', 'ftoc']:
-
-            assert dst.pack_bits == Register.OUTPUT_MODIFIER['none'], "packing is not allowed here."
-            assert src1.unpack_bits != Register.INPUT_MODIFIER['abs'], "'abs' unpacking is not allowed here."
-
-            a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else Register.INPUT_MODIFIER['none'][0]
-            self.op &= ~0b1100
-            self.op |= a_unpack << 2
-
-        if opr in ['vfpack']:
-
-            a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else Register.INPUT_MODIFIER['none'][0]
-            b_unpack = src2.unpack_bits[0] if isinstance(src2, Register) else Register.INPUT_MODIFIER['none'][0]
-
-            self.op &= ~0b101
-            self.op |= a_unpack << 2
-            self.op |= b_unpack
-
-        if opr in ['vfmin', 'vfmax']:
-
-            a_unpack = src1.unpack_bits[1] if isinstance(src1, Register) else Register.INPUT_MODIFIER['none'][1]
-            self.op |= a_unpack
-
-        if opr in ['vfmul']:
-
-            a_unpack = src1.unpack_bits[1] if isinstance(src1, Register) else Register.INPUT_MODIFIER['none'][1]
-            self.op += a_unpack
-
-        if opr in ['fmul']:
-
-            a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else Register.INPUT_MODIFIER['none'][0]
-            b_unpack = src2.unpack_bits[0] if isinstance(src2, Register) else Register.INPUT_MODIFIER['none'][0]
-
-            self.op += dst.pack_bits << 4
-            self.op |= a_unpack << 2
-            self.op |= b_unpack << 0
-
-        if opr in ['fmov']:
-
-            a_unpack = src1.unpack_bits[0] if isinstance(src1, Register) else 0
-
-            self.op |= (dst.pack_bits >> 1) & 1
-            self.mux_b = ((dst.pack_bits & 1) << 2) | a_unpack
-
-
-class AddALU(ALU):
-
-    def __init__(self, insn, *args, **kwargs):
-        self.ops = insn.add_ops
-        self.op_mux_a = insn.add_op_mux_a
-        self.op_mux_b = insn.add_op_mux_b
-        super().__init__(insn, *args, **kwargs)
-        insn.cond_add = self.cond
-        insn.op_add = self.op
-        insn.ma = self.magic
-        insn.waddr_a = self.waddr
-        insn.add_a = self.mux_a
-        insn.add_b = self.mux_b
-
-
-class MulALU(ALU):
-
-    def __init__(self, insn, *args, **kwargs):
-        self.ops = insn.mul_ops
-        self.op_mux_a = insn.mul_op_mux_a
-        self.op_mux_b = insn.mul_op_mux_b
-        super().__init__(insn, *args, **kwargs)
-        insn.cond_mul = self.cond
-        insn.op_mul = self.op
-        insn.mm = self.magic
-        insn.waddr_m = self.waddr
-        insn.mul_a = self.mux_a
-        insn.mul_b = self.mux_b
-
-
-class Branch(object):
-
-    def __init__(self, insn, opr, src, *, cond):
-
-        insn.insn_type = 'branch'
-        insn.cond_br = cond
-
-        if src.startswith('rf'):
-            insn.bdi = 3
-            insn.raddr_a = int(src[2:])
-        else:
-            # Branch to label
-            insn.bdi = 1
-            insn.addr_label = src
-
-
-def mov(asm, dst, src, **kwargs):
-    return Instruction(asm, 'bor', dst, src, src, **kwargs)
-
-
-def fmul(asm, dst, src1, src2, **kwargs):
-    return Instruction(asm, 'nop', Instruction.REGISTERS['null']).fmul(dst, src1, src2, **kwargs)
-
-
-def fmov(asm, dst, src, **kwargs):
-    return Instruction(asm, 'nop', Instruction.REGISTERS['null']).fmov(dst, src, **kwargs)
-
-
-def vfmul(asm, dst, src1, src2, **kwargs):
-    return Instruction(asm, 'nop', Instruction.REGISTERS['null']).vfmul(dst, src1, src2, **kwargs)
-
-
-_alias_ops = [
-    mov,
-    vfmul,
-    fmul,
-    fmov,
-]
+        return 0 \
+            | (0b10 << 56) \
+            | (((self.addr & ((1 << 24) - 1)) >> 3) << 35) \
+            | (cond_br << 32) \
+            | ((self.addr >> 24) << 24) \
+            | (self.bdi << 12) \
+            | ((self.raddr_a if self.raddr_a is not None else 0) << 6)
 
 
 class SFUIntegrator(Register):
@@ -830,7 +877,16 @@ class SFUIntegrator(Register):
         super(SFUIntegrator, self).__init__(reg.name, reg.magic, reg.waddr)
 
     def __call__(self, dst, src, **kwargs):
-        return Instruction(self.asm, self.op_name, dst, src, **kwargs)
+        return ALU(self.asm, self.op_name, dst, src, **kwargs)
+
+
+def mov(asm, dst, src, **kwargs):
+    return ALU(asm, 'bor', dst, src, src, **kwargs)
+
+
+_alias_ops = [
+    mov,
+]
 
 
 def qpu(func):
@@ -841,19 +897,22 @@ def qpu(func):
         g_orig = g.copy()
         g['L'] = Label(asm)
         g['R'] = Reference()
-        g['b'] = functools.partial(Instruction, asm, 'b')
-        for add_op in Instruction.add_ops.keys():
+        g['b'] = functools.partial(Branch, asm, 'b')
+        for mul_op in MulALUOp.OPERATIONS.keys():
+            g[mul_op] = functools.partial(ALU, asm, mul_op)
+        for add_op in AddALUOp.OPERATIONS.keys():
             if not add_op.startswith('_op_'):
-                g[add_op] = functools.partial(Instruction, asm, add_op)
-        for alias_op in _alias_ops:
-            g[alias_op.__name__] = functools.partial(alias_op, asm)
+                g[add_op] = functools.partial(ALU, asm, add_op)
         for waddr, reg in Instruction.REGISTERS.items():
             if waddr.startswith('_reg_'):
                 g[waddr[5:]] = SFUIntegrator(asm, waddr[5:])
             else:
                 g[waddr] = reg
+        for alias_op in _alias_ops:
+            g[alias_op.__name__] = functools.partial(alias_op, asm)
         for name, sig in Instruction.SIGNALS.items():
-            g[name] = sig
+            if name != 'smimm':  # smimm signal is automatically inserted
+                g[name] = sig
         func(asm, *args, **kwargs)
         g.clear()
         for key, value in g_orig.items():
