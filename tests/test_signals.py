@@ -63,9 +63,9 @@ def test_signal_ldtmu():
         assert (Y[1] == 2).all()
         assert (Y[2] == 4).all()
 
-# rot works for MulALU
+# rot signal with rN source performs as a full rotate
 @qpu
-def qpu_signal_rot(asm):
+def qpu_full_rotate(asm):
 
     eidx(r0, sig = ldunif)
     mov(rf0, r5, sig = ldunif)
@@ -96,11 +96,11 @@ def qpu_signal_rot(asm):
     nop()
     nop()
 
-def test_signal_rot():
+def test_full_rotate():
 
     with Driver() as drv:
 
-        code = drv.program(qpu_signal_rot)
+        code = drv.program(qpu_full_rotate)
         X = drv.alloc((16, ), dtype = 'int32')
         Y = drv.alloc((len(range(-15, 16)), 16), dtype = 'int32')
         unif = drv.alloc(3, dtype = 'uint32')
@@ -120,7 +120,64 @@ def test_signal_rot():
             assert (Y[ix] == expected[(-rot%16):(-rot%16)+16]).all()
 
 
-# half broadcast example
+# rot signal with rfN source performs as a half rotate
+@qpu
+def qpu_half_rotate(asm):
+
+    eidx(r0, sig = ldunif)
+    mov(rf0, r5, sig = ldunif)
+    shl(r3, 4, 4).mov(rf1, r5)
+
+    shl(r0, r0, 2)
+    add(rf0, rf0, r0)
+    add(rf1, rf1, r0)
+
+    mov(tmua, rf0, sig = thrsw).add(rf0, rf0, r3)
+    nop()
+    nop()
+    nop(sig = ldtmu(rf32))
+    nop() # required before rotate
+
+    for i in range(-15, 16):
+        nop().add(r1, rf32, rf32, sig = rot(i))
+        mov(tmud, r1)
+        mov(tmua, rf1)
+        tmuwt().add(rf1, rf1, r3)
+
+    nop(sig = thrsw)
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop()
+
+def test_half_rotate():
+
+    with Driver() as drv:
+
+        code = drv.program(qpu_half_rotate)
+        X = drv.alloc((16, ), dtype = 'int32')
+        Y = drv.alloc((len(range(-15, 16)), 16), dtype = 'int32')
+        unif = drv.alloc(3, dtype = 'uint32')
+
+        X[:] = np.arange(16)
+        Y[:] = 0
+
+        unif[0] = X.addresses()[0]
+        unif[1] = Y.addresses()[0,0]
+
+        start = time.time()
+        drv.execute(code, unif.addresses()[0])
+        end = time.time()
+
+        expected = np.concatenate([X.reshape(4,4)]*2, axis=1)*2
+        for ix, rot in enumerate(range(-15, 16)):
+            assert (Y[ix] == expected[:,(-rot%4):(-rot%4)+4].ravel()).all()
+
+
+# instruction with r5 dst performs as a half broadcast
 @qpu
 def qpu_half_broadcast(asm):
 
