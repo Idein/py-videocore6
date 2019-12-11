@@ -126,6 +126,8 @@ class Signals(set):
             sig = sigs
             if sig.name in [s.name for s in self]:
                 raise AssembleError(f'Signal "{sig}" is duplicated')
+            if sig.rot == 0:  # ignore rot(0)
+                return
             super(Signals, self).add(sig)
             if len([s.dst for s in self if s.dst is not None]) > 1:
                 raise AssembleError('Too many signals that require destination register')
