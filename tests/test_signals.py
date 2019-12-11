@@ -120,9 +120,9 @@ def test_full_rotate():
             assert (Y[ix] == expected[(-rot%16):(-rot%16)+16]).all()
 
 
-# rot signal with rfN source performs as a half rotate
+# rot signal with rfN source performs as a quad rotate
 @qpu
-def qpu_half_rotate(asm):
+def qpu_quad_rotate(asm):
 
     eidx(r0, sig = ldunif)
     mov(rf0, r5, sig = ldunif)
@@ -153,11 +153,11 @@ def qpu_half_rotate(asm):
     nop()
     nop()
 
-def test_half_rotate():
+def test_quad_rotate():
 
     with Driver() as drv:
 
-        code = drv.program(qpu_half_rotate)
+        code = drv.program(qpu_quad_rotate)
         X = drv.alloc((16, ), dtype = 'int32')
         Y = drv.alloc((len(range(-15, 16)), 16), dtype = 'int32')
         unif = drv.alloc(3, dtype = 'uint32')
@@ -177,9 +177,9 @@ def test_half_rotate():
             assert (Y[ix] == expected[:,(-rot%4):(-rot%4)+4].ravel()).all()
 
 
-# instruction with r5 dst performs as a half broadcast
+# instruction with r5 dst performs as a quad broadcast
 @qpu
-def qpu_half_broadcast(asm):
+def qpu_quad_broadcast(asm):
 
     eidx(r0, sig = ldunif)
     mov(rf0, r5, sig = ldunif)
@@ -210,11 +210,11 @@ def qpu_half_broadcast(asm):
     nop()
     nop()
 
-def test_half_broadcast():
+def test_quad_broadcast():
 
     with Driver() as drv:
 
-        code = drv.program(qpu_half_broadcast)
+        code = drv.program(qpu_quad_broadcast)
         X = drv.alloc((16, ), dtype = 'int32')
         Y = drv.alloc((len(range(-15, 16)), 16), dtype = 'int32')
         unif = drv.alloc(3, dtype = 'uint32')
