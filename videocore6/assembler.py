@@ -879,6 +879,16 @@ class Branch(Instruction):
             | ((self.raddr_a if self.raddr_a is not None else 0) << 6)
 
 
+class Raw(Instruction):
+
+    def __init__(self, asm, packed_code):
+        super(Raw, self).__init__(asm)
+        self.packed_code = packed_code
+
+    def pack(self):
+        return self.packed_code
+
+
 class SFUIntegrator(Register):
 
     def __init__(self, asm, name):
@@ -910,6 +920,7 @@ def qpu(func):
         g['L'] = Label(asm)
         g['R'] = Reference(asm)
         g['b'] = functools.partial(Branch, asm, 'b')
+        g['raw'] = functools.partial(Raw, asm)
         for mul_op in MulALUOp.OPERATIONS.keys():
             g[mul_op] = functools.partial(ALU, asm, mul_op)
         for add_op in AddALUOp.OPERATIONS.keys():
