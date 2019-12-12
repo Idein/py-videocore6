@@ -313,7 +313,7 @@ def qpu_full_broadcast(asm):
     nop()
     nop()
     nop(sig = ldtmu(r0))
-    nop() # required before rotate ?
+    nop() # required before rotate
 
     for i in range(-15, 16):
         nop().mov(r5rep, r0, sig = [rot(ix) for ix in [i] if ix != 0] )
@@ -354,6 +354,63 @@ def test_full_broadcast():
             assert (Y[ix] == expected[(-rot%16)].repeat(16)).all()
 
 
+# broadcast alias
+@qpu
+def qpu_broadcast_alias(asm):
+
+    eidx(r0, sig = ldunif)
+    mov(rf0, r5, sig = ldunif)
+    shl(r3, 4, 4).mov(rf1, r5)
+
+    shl(r0, r0, 2)
+    add(rf0, rf0, r0)
+    add(rf1, rf1, r0)
+
+    mov(tmua, rf0, sig = thrsw).add(rf0, rf0, r3)
+    nop()
+    nop()
+    nop(sig = ldtmu(r0))
+    nop() # required before rotate
+
+    for i in range(-15, 16):
+        nop().mov(broadcast, r0, sig = [rot(ix) for ix in [i] if ix != 0] )
+        mov(tmud, r5)
+        mov(tmua, rf1)
+        tmuwt().add(rf1, rf1, r3)
+
+    nop(sig = thrsw)
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop()
+
+def test_broadcast_alias():
+
+    with Driver() as drv:
+
+        code = drv.program(qpu_broadcast_alias)
+        X = drv.alloc((16, ), dtype = 'int32')
+        Y = drv.alloc((len(range(-15, 16)), 16), dtype = 'int32')
+        unif = drv.alloc(3, dtype = 'uint32')
+
+        X[:] = np.arange(16)
+        Y[:] = 0
+
+        unif[0] = X.addresses()[0]
+        unif[1] = Y.addresses()[0,0]
+
+        start = time.time()
+        drv.execute(code, unif.addresses()[0])
+        end = time.time()
+
+        expected = X
+        for ix, rot in enumerate(range(-15, 16)):
+            assert (Y[ix] == expected[(-rot%16)].repeat(16)).all()
+
+
 # instruction with r5 dst performs as a quad broadcast
 @qpu
 def qpu_quad_broadcast(asm):
@@ -370,7 +427,7 @@ def qpu_quad_broadcast(asm):
     nop()
     nop()
     nop(sig = ldtmu(r0))
-    nop() # required before rotate ?
+    nop() # required before rotate
 
     for i in range(-15, 16):
         nop().mov(r5, r0, sig = [rot(ix) for ix in [i] if ix != 0] )
@@ -392,6 +449,63 @@ def test_quad_broadcast():
     with Driver() as drv:
 
         code = drv.program(qpu_quad_broadcast)
+        X = drv.alloc((16, ), dtype = 'int32')
+        Y = drv.alloc((len(range(-15, 16)), 16), dtype = 'int32')
+        unif = drv.alloc(3, dtype = 'uint32')
+
+        X[:] = np.arange(16)
+        Y[:] = 0
+
+        unif[0] = X.addresses()[0]
+        unif[1] = Y.addresses()[0,0]
+
+        start = time.time()
+        drv.execute(code, unif.addresses()[0])
+        end = time.time()
+
+        expected = np.concatenate([X,X])
+        for ix, rot in enumerate(range(-15, 16)):
+            assert (Y[ix] == expected[(-rot%16):(-rot%16)+16:4].repeat(4)).all()
+
+
+# instruction with r5 dst performs as a quad broadcast
+@qpu
+def qpu_quad_broadcast_alias(asm):
+
+    eidx(r0, sig = ldunif)
+    mov(rf0, r5, sig = ldunif)
+    shl(r3, 4, 4).mov(rf1, r5)
+
+    shl(r0, r0, 2)
+    add(rf0, rf0, r0)
+    add(rf1, rf1, r0)
+
+    mov(tmua, rf0, sig = thrsw).add(rf0, rf0, r3)
+    nop()
+    nop()
+    nop(sig = ldtmu(r0))
+    nop() # required before rotate
+
+    for i in range(-15, 16):
+        nop().mov(quad_broadcast, r0, sig = [rot(ix) for ix in [i] if ix != 0] )
+        mov(tmud, r5)
+        mov(tmua, rf1)
+        tmuwt().add(rf1, rf1, r3)
+
+    nop(sig = thrsw)
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop()
+
+def test_quad_broadcast_alias():
+
+    with Driver() as drv:
+
+        code = drv.program(qpu_quad_broadcast_alias)
         X = drv.alloc((16, ), dtype = 'int32')
         Y = drv.alloc((len(range(-15, 16)), 16), dtype = 'int32')
         unif = drv.alloc(3, dtype = 'uint32')

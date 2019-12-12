@@ -996,10 +996,15 @@ def _quad_rotate_a(asm, *args, **kwargs):
     return ALU(asm, 'nop').quad_rotate(*args, **kwargs)
 
 
-_add_alias_ops = {
+_alias_ops = {
     'mov': _mov_a,
     'rotate': _rotate_a,
     'quad_rotate': _quad_rotate_a,
+}
+
+_alias_regs = {
+    'broadcast': Instruction.REGISTERS['r5rep'],
+    'quad_broadcast': Instruction.REGISTERS['r5'],
 }
 
 
@@ -1023,8 +1028,10 @@ def qpu(func):
                 g[waddr[5:]] = SFUIntegrator(asm, waddr[5:])
             else:
                 g[waddr] = reg
-        for alias_name, alias_op in _add_alias_ops.items():
+        for alias_name, alias_op in _alias_ops.items():
             g[alias_name] = functools.partial(alias_op, asm)
+        for alias_name, alias_reg in _alias_regs.items():
+            g[alias_name] = alias_reg
         for name, sig in Instruction.SIGNALS.items():
             if name != 'smimm':  # smimm signal is automatically derived
                 g[name] = sig
