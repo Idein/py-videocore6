@@ -144,7 +144,6 @@ class Driver(object):
         file = kwargs.pop('file') if 'file' in kwargs else sys.stdout
         asm = Assembly()
         prog(asm, *args, **kwargs)
-        asm.finalize()
         for insn in asm:
             print(f'{int(insn):#018x}', file=file)
 
@@ -152,7 +151,6 @@ class Driver(object):
 
         asm = Assembly()
         prog(asm, *args, **kwargs)
-        asm.finalize()
         asm = [int(x) for x in asm]
 
         offset = self.code_pos
