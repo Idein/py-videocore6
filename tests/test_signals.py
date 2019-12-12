@@ -237,6 +237,66 @@ def test_quad_rotate():
             assert (Y[ix] == expected[:,(-rot%4):(-rot%4)+4].ravel()).all()
 
 
+# quad_rotate alias
+@qpu
+def qpu_quad_rotate_alias(asm):
+
+    eidx(r0, sig = ldunif)
+    mov(rf0, r5, sig = ldunif)
+    shl(r3, 4, 4).mov(rf1, r5)
+
+    shl(r0, r0, 2)
+    add(rf0, rf0, r0)
+    add(rf1, rf1, r0)
+
+    mov(tmua, rf0, sig = thrsw).add(rf0, rf0, r3)
+    nop()
+    nop()
+    nop(sig = ldtmu(rf32))
+    nop() # required before rotate
+
+    for i in range(-15, 16):
+        if i % 1 == 0:
+            quad_rotate(r1, rf32, i)       # add alias
+        else:
+            nop().quad_rotate(r1, rf32, i) # mul alias
+        mov(tmud, r1)
+        mov(tmua, rf1)
+        tmuwt().add(rf1, rf1, r3)
+
+    nop(sig = thrsw)
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop()
+
+def test_quad_rotate_alias():
+
+    with Driver() as drv:
+
+        code = drv.program(qpu_quad_rotate_alias)
+        X = drv.alloc((16, ), dtype = 'int32')
+        Y = drv.alloc((len(range(-15, 16)), 16), dtype = 'int32')
+        unif = drv.alloc(3, dtype = 'uint32')
+
+        X[:] = np.arange(16)
+        Y[:] = 0
+
+        unif[0] = X.addresses()[0]
+        unif[1] = Y.addresses()[0,0]
+
+        start = time.time()
+        drv.execute(code, unif.addresses()[0])
+        end = time.time()
+
+        expected = np.concatenate([X.reshape(4,4)]*2, axis=1)
+        for ix, rot in enumerate(range(-15, 16)):
+            assert (Y[ix] == expected[:,(-rot%4):(-rot%4)+4].ravel()).all()
+
+
 # instruction with r5rep dst performs as a full broadcast
 @qpu
 def qpu_full_broadcast(asm):

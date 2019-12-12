@@ -966,19 +966,40 @@ def _rotate_m(self, dst, src, rot, **kwargs):
         sigs.add(kwargs['sig'])
         del kwargs['sig']
     sigs.add(Instruction.SIGNALS['rot'](rot))
+    if not isinstance(src, Register) or src.magic != 1:
+        raise AssembleError('Invalid src object for rotate')
     return self.mov(dst, src, sig=sigs, **kwargs)
 
 
 ALU.rotate = _rotate_m
 
 
+def _quad_rotate_m(self, dst, src, rot, **kwargs):
+    sigs = Signals()
+    if 'sig' in kwargs:
+        sigs.add(kwargs['sig'])
+        del kwargs['sig']
+    sigs.add(Instruction.SIGNALS['rot'](rot))
+    if not isinstance(src, Register) or src.magic != 0:
+        raise AssembleError('Invalid src object for quad_rotate')
+    return self.mov(dst, src, sig=sigs, **kwargs)
+
+
+ALU.quad_rotate = _quad_rotate_m
+
+
 def _rotate_a(asm, *args, **kwargs):
     return ALU(asm, 'nop').rotate(*args, **kwargs)
+
+
+def _quad_rotate_a(asm, *args, **kwargs):
+    return ALU(asm, 'nop').quad_rotate(*args, **kwargs)
 
 
 _add_alias_ops = {
     'mov': _mov_a,
     'rotate': _rotate_a,
+    'quad_rotate': _quad_rotate_a,
 }
 
 
