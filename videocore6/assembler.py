@@ -956,13 +956,30 @@ class SFUIntegrator(Register):
         return ALU(self.asm, self.op_name, dst, src, **kwargs)
 
 
-def mov(asm, dst, src, **kwargs):
+def _mov_a(asm, dst, src, **kwargs):
     return ALU(asm, 'bor', dst, src, src, **kwargs)
 
 
-_alias_ops = [
-    mov,
-]
+def _rotate_m(self, dst, src, rot, **kwargs):
+    sigs = Signals()
+    if 'sig' in kwargs:
+        sigs.add(kwargs['sig'])
+        del kwargs['sig']
+    sigs.add(Instruction.SIGNALS['rot'](rot))
+    return self.mov(dst, src, sig=sigs, **kwargs)
+
+
+ALU.rotate = _rotate_m
+
+
+def _rotate_a(asm, *args, **kwargs):
+    return ALU(asm, 'nop').rotate(*args, **kwargs)
+
+
+_add_alias_ops = {
+    'mov': _mov_a,
+    'rotate': _rotate_a,
+}
 
 
 def qpu(func):
@@ -985,8 +1002,8 @@ def qpu(func):
                 g[waddr[5:]] = SFUIntegrator(asm, waddr[5:])
             else:
                 g[waddr] = reg
-        for alias_op in _alias_ops:
-            g[alias_op.__name__] = functools.partial(alias_op, asm)
+        for alias_name, alias_op in _add_alias_ops.items():
+            g[alias_name] = functools.partial(alias_op, asm)
         for name, sig in Instruction.SIGNALS.items():
             if name != 'smimm':  # smimm signal is automatically derived
                 g[name] = sig
