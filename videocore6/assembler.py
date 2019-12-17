@@ -79,13 +79,17 @@ class Register(object):
 
 class Signal(object):
 
-    def __init__(self, name, dst=None):
+    def __init__(self, name, dst=None, rot=None):
         self.name = name
         self.dst = dst
+        self.rot = rot
 
     def is_write(self):
-        ''' Write (to destinatino register) signal '''
+        ''' Write (to destination register) signal '''
         return self.dst is not None
+
+    def is_rotate(self):
+        return self.rot is not None
 
 
 class WriteSignal(object):
@@ -94,7 +98,16 @@ class WriteSignal(object):
         self.name = name
 
     def __call__(self, dst):
-        return Signal(self.name, dst)
+        return Signal(self.name, dst=dst)
+
+
+class RotateSignal(object):
+
+    def __init__(self, name):
+        self.name = name
+
+    def __call__(self, rot):
+        return Signal(self.name, rot=rot)
 
 
 class Signals(set):
@@ -106,10 +119,15 @@ class Signals(set):
         if isinstance(sigs, WriteSignal):
             sig = sigs
             raise AssembleError(f'"{sig}" requires destination register (ex. "{sig}(r0)")')
+        if isinstance(sigs, RotateSignal):
+            sig = sigs
+            raise AssembleError(f'"{sig}" requires rotate number (ex. "{sig}(-1)")')
         elif isinstance(sigs, Signal):
             sig = sigs
             if sig.name in [s.name for s in self]:
                 raise AssembleError(f'Signal "{sig}" is duplicated')
+            if sig.rot == 0:  # ignore rot(0)
+                return
             super(Signals, self).add(sig)
             if len([s.dst for s in self if s.dst is not None]) > 1:
                 raise AssembleError('Too many signals that require destination register')
@@ -158,6 +176,14 @@ class Signals(set):
         dst = [sig.dst for sig in self if sig.dst is not None][0]
         return (dst.magic << 6) | dst.waddr
 
+    def is_rotate(self):
+        return any([sig.is_rotate() for sig in self])
+
+    def rotate_count(self):
+        assert self.is_rotate()
+        rot = [sig.rot for sig in self if sig.rot is not None][0]
+        return rot
+
 
 class Instruction(object):
 
@@ -174,7 +200,7 @@ class Instruction(object):
         'ldtlbu': WriteSignal('ldtlbu'),
         'smimm': Signal('smimm'),
         'ucb': Signal('ucb'),
-        'rot': Signal('rot'),
+        'rot': RotateSignal('rot'),
         'wrtmuc': Signal('wrtmuc'),
     }
 
@@ -383,9 +409,26 @@ class ALURaddrs(object):
         if reg is None:
             return
 
-        assert isinstance(reg, (int, float, Register)), 'Bug: Type error'
+        assert isinstance(reg, (int, float, Register, Signal)), 'Bug: Type error'
 
-        if isinstance(reg, (int, float)):
+        if isinstance(reg, Signal):
+            sig = reg
+            if not sig.is_rotate():
+                return
+            if self.b is None:
+                self.b = sig
+            elif isinstance(self.b, Signal) and self.b.is_rotate() and self.b.rotate_count() == sig.rotate_count():
+                pass
+            else:
+                if isinstance(self.b, (int, float)):
+                    raise AssembleError(f'Conflict small immediates {self.b} and signal {reg}')
+                elif isinstance(self.b, Register):
+                    raise AssembleError(f'Conflict register {self.b} and signal {reg}')
+                elif isinstance(self.b, Signal):
+                    raise AssembleError(f'Conflict signal {self.b} and signal {reg}')
+                else:
+                    assert False, 'Bug: Lack of type exhaustivity'
+        elif isinstance(reg, (int, float)):
             # small immediate should be b
             if self.b is None:
                 self.b = reg
@@ -396,11 +439,11 @@ class ALURaddrs(object):
                     raise AssembleError(f'Conflict small immediates {self.b} and small immediates {reg}')
                 elif isinstance(self.b, Register):
                     raise AssembleError(f'Conflict register {self.b} and small immediates {reg}')
+                elif isinstance(self.b, Signal):
+                    raise AssembleError(f'Conflict signal {self.b} small immediates {reg}')
                 else:
                     assert False, 'Bug: Lack of type exhaustivity'
         else:
-            # both ok
-
             # already exist
             if self.a is not None:
                 if self.a.name == reg.name:
@@ -430,22 +473,30 @@ class ALURaddrs(object):
         if isinstance(self.a, Register):
             raddr_a = self.a.waddr
 
-        if isinstance(self.b, int):
+        def pack_smimms_int(x):
             smimms_int = {}
             for i in range(16):
                 smimms_int[i] = i
                 smimms_int[i - 16] = i + 16
                 smimms_int[float_to_int(2 ** (i - 8))] = i + 32
-            raddr_b = smimms_int[self.b]
-        if isinstance(self.b, float):
+            return smimms_int[x]
+
+        def pack_smimms_float(x):
             smimms_float = {}
             for i in range(16):
                 # Denormal numbers
                 smimms_float[int_to_float(i)] = i
                 smimms_float[2 ** (i - 8)] = i + 32
-            raddr_b = smimms_float[self.b]
+            return smimms_float[x]
+
+        if isinstance(self.b, int):
+            raddr_b = pack_smimms_int(self.b)
+        if isinstance(self.b, float):
+            raddr_b = pack_smimms_float(self.b)
         if isinstance(self.b, Register):
             raddr_b = self.b.waddr
+        if isinstance(self.b, Signal):
+            raddr_b = pack_smimms_int(self.b.rot)
 
         return 0 \
             | (raddr_a << 6) \
@@ -822,7 +873,10 @@ class ALU(Instruction):
         sigs = Signals()
         sigs.add(add_op.sigs)
         sigs.add(mul_op.sigs)
-        if raddr.has_smimm():
+        for sig in sigs:
+            raddr.add(sig)
+
+        if raddr.has_smimm() and not sigs.is_rotate():
             sigs.add(Instruction.SIGNALS['smimm'])
 
         cond = ALUConditions(add_op.cond, mul_op.cond)
@@ -879,6 +933,16 @@ class Branch(Instruction):
             | ((self.raddr_a if self.raddr_a is not None else 0) << 6)
 
 
+class Raw(Instruction):
+
+    def __init__(self, asm, packed_code):
+        super(Raw, self).__init__(asm)
+        self.packed_code = packed_code
+
+    def pack(self):
+        return self.packed_code
+
+
 class SFUIntegrator(Register):
 
     def __init__(self, asm, name):
@@ -892,13 +956,56 @@ class SFUIntegrator(Register):
         return ALU(self.asm, self.op_name, dst, src, **kwargs)
 
 
-def mov(asm, dst, src, **kwargs):
+def _mov_a(asm, dst, src, **kwargs):
     return ALU(asm, 'bor', dst, src, src, **kwargs)
 
 
-_alias_ops = [
-    mov,
-]
+def _rotate_m(self, dst, src, rot, **kwargs):
+    sigs = Signals()
+    if 'sig' in kwargs:
+        sigs.add(kwargs['sig'])
+        del kwargs['sig']
+    sigs.add(Instruction.SIGNALS['rot'](rot))
+    if not isinstance(src, Register) or src.magic != 1:
+        raise AssembleError('Invalid src object for rotate')
+    return self.mov(dst, src, sig=sigs, **kwargs)
+
+
+ALU.rotate = _rotate_m
+
+
+def _quad_rotate_m(self, dst, src, rot, **kwargs):
+    sigs = Signals()
+    if 'sig' in kwargs:
+        sigs.add(kwargs['sig'])
+        del kwargs['sig']
+    sigs.add(Instruction.SIGNALS['rot'](rot))
+    if not isinstance(src, Register) or src.magic != 0:
+        raise AssembleError('Invalid src object for quad_rotate')
+    return self.mov(dst, src, sig=sigs, **kwargs)
+
+
+ALU.quad_rotate = _quad_rotate_m
+
+
+def _rotate_a(asm, *args, **kwargs):
+    return ALU(asm, 'nop').rotate(*args, **kwargs)
+
+
+def _quad_rotate_a(asm, *args, **kwargs):
+    return ALU(asm, 'nop').quad_rotate(*args, **kwargs)
+
+
+_alias_ops = {
+    'mov': _mov_a,
+    'rotate': _rotate_a,
+    'quad_rotate': _quad_rotate_a,
+}
+
+_alias_regs = {
+    'broadcast': Instruction.REGISTERS['r5rep'],
+    'quad_broadcast': Instruction.REGISTERS['r5'],
+}
 
 
 def qpu(func):
@@ -910,6 +1017,7 @@ def qpu(func):
         g['L'] = Label(asm)
         g['R'] = Reference(asm)
         g['b'] = functools.partial(Branch, asm, 'b')
+        g['raw'] = functools.partial(Raw, asm)
         for mul_op in MulALUOp.OPERATIONS.keys():
             g[mul_op] = functools.partial(ALU, asm, mul_op)
         for add_op in AddALUOp.OPERATIONS.keys():
@@ -920,8 +1028,10 @@ def qpu(func):
                 g[waddr[5:]] = SFUIntegrator(asm, waddr[5:])
             else:
                 g[waddr] = reg
-        for alias_op in _alias_ops:
-            g[alias_op.__name__] = functools.partial(alias_op, asm)
+        for alias_name, alias_op in _alias_ops.items():
+            g[alias_name] = functools.partial(alias_op, asm)
+        for alias_name, alias_reg in _alias_regs.items():
+            g[alias_name] = alias_reg
         for name, sig in Instruction.SIGNALS.items():
             if name != 'smimm':  # smimm signal is automatically derived
                 g[name] = sig
