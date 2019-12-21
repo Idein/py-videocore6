@@ -174,7 +174,6 @@ class Driver(object):
 
         wg_x, wg_y, wg_z = workgroup
         wg_size = wg_x * wg_y * wg_z
-        wgs_per_sg = wgs_per_sg
 
         def roundup(n, d):
             return (n + d - 1) // d
