@@ -206,4 +206,4 @@ class Driver(object):
         # XXX: Separate function
         for bo_handle in self.bo_handles:
             self.drm.v3d_wait_bo(bo_handle,
-                                 timeout_ns=int(10 * timeout_sec / 1e-9))
+                                 timeout_ns=int(timeout_sec / 1e-9))
