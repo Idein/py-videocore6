@@ -127,7 +127,7 @@ def test_parallel_16():
         unif[:,3] = Ys.addresses()[:,0]
 
         start = time.time()
-        drv.execute(serial_code, unif.addresses()[0,0], thread=thread)
+        drv.execute(serial_code, unif.addresses()[0,0])
         end = time.time()
         serial_cost = end - start
 
