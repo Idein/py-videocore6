@@ -170,14 +170,25 @@ class Driver(object):
 
         return code
 
-    def execute(self, code, uniforms=None, timeout_sec=10):
+    def execute(self, code, uniforms=None, timeout_sec=10, workgroup=(16, 1, 1), wgs_per_sg=16, thread=1):
+
+        wg_x, wg_y, wg_z = workgroup
+        wg_size = wg_x * wg_y * wg_z
+
+        def roundup(n, d):
+            return (n + d - 1) // d
 
         self.drm.v3d_submit_csd(
             cfg=[
                 # WGS X, Y, Z and settings
-                0, 0, 0, 0,
+                wg_x << 16,
+                wg_y << 16,
+                wg_z << 16,
+                ((roundup(wgs_per_sg * wg_size, 16) - 1) << 12) |
+                (wgs_per_sg << 8) |
+                (wg_size & 0xff),
                 # Number of batches minus 1
-                0,
+                thread - 1,
                 # Shader address, pnan, singleseg, threading
                 code.addresses()[0],
                 # Uniforms address
