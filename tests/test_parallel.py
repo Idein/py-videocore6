@@ -112,9 +112,9 @@ def test_parallel_16():
 
         serial_code = drv.program(qpu_serial)
         parallel_code = drv.program(qpu_parallel_16)
-        X = drv.alloc((thread, 16), dtype = 'int32')
-        Ys = drv.alloc((thread, 16), dtype = 'int32')
-        Yp = drv.alloc((thread, 16), dtype = 'int32')
+        X = drv.alloc((thread, 16), dtype = 'float32')
+        Ys = drv.alloc((thread, 16), dtype = 'float32')
+        Yp = drv.alloc((thread, 16), dtype = 'float32')
         unif = drv.alloc((thread, 4), dtype = 'uint32')
 
         X[:] = np.random.randn(*X.shape)
