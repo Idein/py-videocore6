@@ -15,8 +15,13 @@ class Assembly(list):
 
     def _gen_unused_label(self, label_format='{}'):
         n = len(self.labels)
-        while label_format.format(n) in self.labels:
+        label = label_format.format(n)
+        while label in self.labels:
             n += 1
+            next_label = label_format.format(n)
+            assert label != next_label, 'Bug: Invalid label format'
+            label = next_label
+
         return label_format.format(n)
 
 
