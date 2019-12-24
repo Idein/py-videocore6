@@ -9,12 +9,12 @@ import numpy as np
 def cost(asm):
     shl(r0, 8, 8)
     shl(r0, r0, 8)
-    L.loop
-    sub(r0, r0, 1, cond = 'pushn')
-    b(R.loop, cond = 'anyna')
-    nop()
-    nop()
-    nop()
+    with loop as l:
+        sub(r0, r0, 1, cond = 'pushn')
+        l.b(cond = 'anyna')
+        nop()
+        nop()
+        nop()
 
 @qpu
 def qpu_serial(asm):

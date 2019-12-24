@@ -13,6 +13,12 @@ class Assembly(list):
         super().__init__(*args, **kwargs)
         self.labels = {}
 
+    def _gen_unused_label(self, label_format='{}'):
+        n = len(self.labels)
+        while label_format.format(n) in self.labels:
+            n += 1
+        return label_format.format(n)
+
 
 class Label(object):
 
@@ -1008,6 +1014,24 @@ _alias_regs = {
 }
 
 
+class Loop(object):
+
+    def __init__(self, asm):
+        self.asm = asm
+        self.name = None
+
+    def __enter__(self):
+        self.name = self.asm._gen_unused_label('__generated_loop_label_{}')
+        Label(self.asm).__getattr__(self.name)
+        return self
+
+    def b(self, *args, **kwargs):
+        Branch(self.asm, 'b', Reference(self.asm, self.name), *args, **kwargs)
+
+    def __exit__(self, ex_type, ex_value, trace):
+        pass
+
+
 def qpu(func):
 
     @functools.wraps(func)
@@ -1016,6 +1040,7 @@ def qpu(func):
         g_orig = g.copy()
         g['L'] = Label(asm)
         g['R'] = Reference(asm)
+        g['loop'] = Loop(asm)
         g['b'] = functools.partial(Branch, asm, 'b')
         g['raw'] = functools.partial(Raw, asm)
         for mul_op in MulALUOp.OPERATIONS.keys():

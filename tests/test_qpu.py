@@ -9,12 +9,12 @@ def qpu_clock(asm):
 
     nop(sig = ldunif)
 
-    L.loop
-    sub(r5, r5, 1, cond = 'pushn')
-    b(R.loop, cond = 'anyna')
-    nop()
-    nop()
-    nop()
+    with loop as l:
+        sub(r5, r5, 1, cond = 'pushn')
+        l.b(cond = 'anyna')
+        nop()
+        nop()
+        nop()
 
     nop(sig = thrsw)
     nop(sig = thrsw)
@@ -58,15 +58,14 @@ def qpu_tmu_write(asm):
     shl(r0, r0, 2).mov(rf0, r0)
     add(r2, r2, r0)
 
-    L.loop
-    if True:
+    with loop as l:
 
         # rf0: Data to be written.
         # r0: Overwritten.
         # r2: Address to write data to.
 
         sub(r1, r1, 1, cond = 'pushz').mov(tmud, rf0)
-        b(R.loop, cond = 'anyna')
+        l.b(cond = 'anyna')
         # rf0 += 16
         sub(rf0, rf0, -16).mov(tmua, r2)
         # r2 += 64
@@ -117,8 +116,7 @@ def qpu_tmu_read(asm):
     add(r1, r1, r2, sig = ldunif)
     add(r2, r5, r2)
 
-    L.loop
-    if True:
+    with loop as l:
 
         mov(tmua, r1, sig = thrsw)
         nop()
@@ -126,7 +124,7 @@ def qpu_tmu_read(asm):
         nop(sig = ldtmu(rf0))
 
         sub(r0, r0, 1, cond = 'pushz').add(tmud, rf0, 1)
-        b(R.loop, cond = 'anyna')
+        l.b(cond = 'anyna')
         shl(r3, 4, 4).mov(tmua, r2)
         # r1 += 64
         # r2 += 64
