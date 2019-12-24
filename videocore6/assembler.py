@@ -13,6 +13,17 @@ class Assembly(list):
         super().__init__(*args, **kwargs)
         self.labels = {}
 
+    def _gen_unused_label(self, label_format='{}'):
+        n = len(self.labels)
+        label = label_format.format(n)
+        while label in self.labels:
+            n += 1
+            next_label = label_format.format(n)
+            assert label != next_label, 'Bug: Invalid label format'
+            label = next_label
+
+        return label_format.format(n)
+
 
 class Label(object):
 
@@ -1008,6 +1019,30 @@ _alias_regs = {
 }
 
 
+class Loop(object):
+
+    def __init__(self, asm, name):
+        self.asm = asm
+        self.name = name
+
+    def b(self, *args, **kwargs):
+        Branch(self.asm, 'b', Reference(self.asm, self.name), *args, **kwargs)
+
+
+class LoopHelper(object):
+
+    def __init__(self, asm):
+        self.asm = asm
+
+    def __enter__(self):
+        name = self.asm._gen_unused_label('__generated_loop_label_{}')
+        Label(self.asm).__getattr__(name)
+        return Loop(self.asm, name)
+
+    def __exit__(self, ex_type, ex_value, trace):
+        pass
+
+
 def qpu(func):
 
     @functools.wraps(func)
@@ -1016,6 +1051,7 @@ def qpu(func):
         g_orig = g.copy()
         g['L'] = Label(asm)
         g['R'] = Reference(asm)
+        g['loop'] = LoopHelper(asm)
         g['b'] = functools.partial(Branch, asm, 'b')
         g['raw'] = functools.partial(Raw, asm)
         for mul_op in MulALUOp.OPERATIONS.keys():
