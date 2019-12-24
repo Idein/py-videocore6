@@ -56,13 +56,11 @@ def qpu_serial(asm):
 @qpu
 def qpu_parallel_16(asm):
 
-    tidx(r0, sig = ldunifrf(rf0)) # rf0 = unif[0,0]
-    shr(r2, r0, 2)
-    band(r1, r0, 0b11)            # thread_id
-    band(r2, r2, 0b1111)          # qpu_id
-    shr(r1, r1, 1)
-    shl(r2, r2, 1)
-    add(rf31, r1, r2)             # rf31 = (qpu_id * 2) + (thread_id >> 1)
+    tidx(r0, sig = ldunifrf(rf0))
+    shr(r0, r0, 1).mov(r1, 1)
+    shl(r1, r1, 5)
+    sub(r1, r1, 1)
+    band(rf31, r0, r1) # rf31 = (qpu_id * 2) + (thread_id >> 1)
 
     # rf31 * unif[0,1] * sizeof(float) + (unif.addresses[0,0] + 2 * sizeof(float))
     nop(sig = ldunifrf(rf1))      # rf1 = unif[0,1]
