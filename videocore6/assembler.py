@@ -1064,6 +1064,7 @@ def qpu(func):
                 g[waddr[5:]] = SFUIntegrator(asm, waddr[5:])
             else:
                 g[waddr] = reg
+        g['rf'] = [Instruction.REGISTERS[f'rf{i}'] for i in range(64)]
         for alias_name, alias_op in _alias_ops.items():
             g[alias_name] = functools.partial(alias_op, asm)
         for alias_name, alias_reg in _alias_regs.items():

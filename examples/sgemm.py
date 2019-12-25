@@ -17,71 +17,172 @@ def getsec():
 
 
 @qpu
-def qpu_sgemm_rnn_naive(asm):
+def load_params(asm, thread, regs):
+
+    if thread == 1:
+        bxor(r0, r0, r0, sig = ldunifrf(rf0))
+    elif thread == 8:
+        #  8 threads (1 threads / qpu)
+        tidx(r0, sig = ldunifrf(rf0))
+        shr(r0, r0, 2)
+        mov(r1, 0b1111)
+    elif thread == 16:
+        # 16 threads (2 threads / qpu)
+        tidx(r0, sig = ldunifrf(rf0))
+        shr(r0, r0, 1).mov(r1, 1)
+        shl(r1, r1, 5)
+        sub(r1, r1, 1)
+    else:
+        assert thread in [1,8,16]
+
+    band(r3, r0, r1, sig = ldunifrf(rf1))
+    shl(r0, rf1, 2)
+    umul24(r0, r0, r3)
+    eidx(r1).add(r0, r0, rf0)
+    shl(r1, r1, 2)
+    shl(r3, 4, 4).add(r0, r0, r1)
+    n = len(regs)
+    mov(tmua, r0, sig = thrsw).add(r0, r0, r3)
+    nop()
+    nop()
+    nop(sig = ldtmu(r1))
+    for i in range(n):
+        if i % 16 == 0:
+            mov(r5rep, r1)
+            mov(regs[i], r5)
+        elif i - 1 == n:
+            rotate(r5rep, r1, - (i % 16))
+            mov(regs[i], r5)
+        elif i % 16 == 15:
+            mov(tmua, r0, sig = thrsw).add(r0, r0, r3)
+            rotate(r5rep, r1, - (i % 16))
+            mov(regs[i], r5)
+            nop(sig = ldtmu(r1))
+        else:
+            rotate(r5rep, r1, - (i % 16))
+            mov(regs[i], r5)
+
+@qpu
+def qpu_sgemm_rnn_naive(asm, thread):
+
+    params = [
+        'P',
+        'Q',
+        'R',
+        'A_base',
+        'A_stride',
+        'B_base',
+        'B_stride',
+        'C_base',
+        'C_stride',
+        'alpha',
+        'beta',
+    ]
+
+    values = [
+        'A_cur',
+        'B_cur',
+        'C_cur',
+        'i', 'j', 'k',
+    ]
 
     g = globals()
+    for i, reg in enumerate(params + values):
+        g['reg_' + reg] = g['rf' + str(i+32)]
 
-    for i, reg in enumerate(['A_i', 'A_k', 'B_i', 'B_j', 'B_k', 'C_j',
-            'alpha', 'beta', 'P', 'Q', 'R', 'i', 'j', 'k', '64', '4_Q', '4_R']):
-        g['reg_' + reg] = g['rf' + str(i)]
+    load_params(asm, thread, [g['reg_' + reg] for reg in params])
 
-    for reg in ['A_i', 'B_i', 'C_j', 'alpha', 'beta', 'P', 'Q', 'R']:
-        nop(sig = ldunif)
-        mov(g['reg_' + reg], r5)
+    add(r0, reg_P, 15)
+    shr(r0, r0, 4)
+    shl(r0, r0, 4)
+    add(r1, reg_R, 15)
+    shr(r1, r1, 4)
+    shl(r1, r1, 6)
+    umul24(r3, r0, reg_A_stride)
+    add(reg_A_base, reg_A_base, r3)
+    add(reg_B_base, reg_B_base, r1)
+    umul24(r3, r0, reg_C_stride)
+    add(reg_C_base, reg_C_base, r3)
+    add(reg_C_base, reg_C_base, r1)
 
-    # B_i += 4 * eidx
-    # C_j += 4 * eidx
-    eidx(r0)
-    shl(r0, r0, 2)
-    add(reg_B_i, reg_B_i, r0)
-    add(reg_C_j, reg_C_j, r0)
+    for i in range(16):
+        mov(rf[i], 0.0).mov(rf[i+16], 0.0)
 
-    shl(reg_64, 4, 4)
-    shl(reg_4_Q, reg_Q, 2)
-    shl(reg_4_R, reg_R, 2)
+    # i=(p+15)/16.
+    add(r0, reg_P, 15)
+    shr(reg_i, r0, 4)
+    with loop as li:
 
-    mov(reg_i, reg_P)
+        # j=(r+15)/16
+        add(r0, reg_R, 15)
+        shr(reg_j, r0, 4)
+        with loop as lj:
 
-    L.loop_i
-    if True:
+            shl(r0, reg_i, 4)
+            umul24(r3, r0, reg_C_stride)
+            shl(r1, reg_j, 6)
+            sub(reg_C_cur, reg_C_base, r3)
+            sub(reg_C_cur, reg_C_cur, r1)
+            umul24(r3, r0, reg_A_stride)
+            sub(reg_A_cur, reg_A_base, r3)
+            sub(reg_B_cur, reg_B_base, r1)
 
-        shr(reg_j, reg_R, 4)
-        mov(reg_B_j, reg_B_i)
+            mov(reg_k, reg_Q)
+            with loop as lk:
 
-        L.loop_j
-        if True:
+                eidx(r0)
+                umul24(r1, r0, reg_A_stride)
+                add(r1, r1, reg_A_cur).add(reg_A_cur, reg_A_cur, 4)
+                mov(tmua, r1, sig = thrsw)
+                shl(r1, r0, 2)
+                add(r1, r1, reg_B_cur).add(reg_B_cur, reg_B_cur, reg_B_stride)
+                mov(tmua, r1, sig = thrsw)
 
-            mov(reg_A_k, reg_A_i).mov(reg_B_k, reg_B_j)
-            mov(r0, 0.).mov(reg_k, reg_Q)
+                nop(sig = ldtmu(r0))
+                mov(r5rep, r0)
+                nop(sig = ldtmu(r4))
+                nop().fmul(r3, r5, r4)
+                for i in range(1,16):
+                    rotate(r5rep, r0, -i)
+                    fadd(rf[i-1], rf[i-1], r3).fmul(r3, r5, r4)
+                fadd(rf15, rf15, r3)
 
-            L.loop_k
-            if True:
-
-                mov(tmua, reg_A_k, sig = thrsw)
                 sub(reg_k, reg_k, 1, cond = 'pushz')
-                mov(tmua, reg_B_k, sig = thrsw)
-                nop(sig = ldtmu(r1))
-                nop(sig = ldtmu(r2))
+                lk.b(cond = 'anyna')
+                nop() # delay slot
+                nop() # delay slot
+                nop() # delay slot
 
-                b(R.loop_k, cond = 'anyna')
-                fmul(r1, r1, r2)
-                fadd(r0, r0, r1).add(reg_A_k, reg_A_k, 4)
-                add(reg_B_k, reg_B_k, reg_4_R)
+            eidx(r0)
+            shl(r0, r0, 2)
+            add(r1, reg_C_cur, r0)
+            mov(tmua, r1, sig = thrsw).add(r1, r1, reg_C_stride)
+            fmul(rf[0], rf[0], reg_alpha)
+            for i in range(1, 16):
+                mov(tmua, r1, sig = thrsw).add(r1, r1, reg_C_stride)
+                fmul(rf[i], rf[i], reg_alpha, sig = ldtmu(rf[i+15]))
+            mov(r0, reg_beta).fmul(r3, rf[16], reg_beta, sig = ldtmu(rf[31]))
+            for i in range(16):
+                fadd(rf[i], rf[i], r3).fmul(r3, rf[i+17], r0)
 
-            mov(tmua, reg_C_j, sig = thrsw)
-            fmul(r0, r0, reg_alpha)
+            eidx(r0)
+            shl(r0, r0, 2)
+            add(r1, reg_C_cur, r0)
+            for i in range(16):
+                mov(tmud, rf[i])
+                mov(tmua, r1).add(r1, r1, reg_C_stride)
+                mov(rf[i], 0.0).mov(rf[i+16], 0.0)
+                tmuwt()
+
             sub(reg_j, reg_j, 1, cond = 'pushz')
-            nop(sig = ldtmu(r1))
-            fmul(r1, r1, reg_beta)
-
-            b(R.loop_j, cond = 'anyna')
-            fadd(tmud, r0, r1).add(reg_B_j, reg_B_j, reg_64)
-            add(reg_C_j, reg_C_j, reg_64).mov(tmua, reg_C_j)
-            tmuwt()
+            lj.b(cond = 'anyna')
+            nop() # delay slot
+            nop() # delay slot
+            nop() # delay slot
 
         sub(reg_i, reg_i, 1, cond = 'pushz')
-        b(R.loop_i, cond = 'anyna')
-        add(reg_A_i, reg_A_i, reg_4_Q)
+        li.b(cond = 'anyna')
+        nop()
         nop()
         nop()
 
@@ -93,22 +194,22 @@ def qpu_sgemm_rnn_naive(asm):
     nop()
     nop()
     nop()
-
 
 def sgemm_rnn_naive():
 
-    P = 123
-    Q = 567
-    R = 16 * 32
+    thread = 8
 
-    assert R % 16 == 0
+    P = 1024
+    Q = 1024
+    R = 1024
+
+    assert P % (16 * 2) == 0
+    assert R % (16 * 4) == 0
 
     with Driver() as drv:
 
-        #drv.dump_program(qpu_sgemm_rnn_naive); exit(0)
+        code = drv.program(lambda asm: qpu_sgemm_rnn_naive(asm, thread))
 
-        code = drv.program(qpu_sgemm_rnn_naive)
-        unif = drv.alloc(1024, dtype = 'uint32')
         A = drv.alloc((P, Q), dtype = 'float32')
         B = drv.alloc((Q, R), dtype = 'float32')
         C = drv.alloc((P, R), dtype = 'float32')
@@ -124,14 +225,35 @@ def sgemm_rnn_naive():
         C_ref = alpha * A.dot(B) + beta * C
         time_ref = getsec() - start
 
-        for i, x in enumerate([A.addresses()[0, 0], B.addresses()[0, 0],
-                C.addresses()[0, 0], *pack_unpack('f', 'I', alpha, beta),
-                P, Q, R]):
-            unif[i] = x
+        def block_2x4_params(i, j):
+            tile_P = P // 2
+            tile_R = R // 4
+            return [
+                tile_P, Q, tile_R,
+                A.addresses()[tile_P*i, 0       ],
+                A.strides[0],
+                B.addresses()[0       , tile_R*j],
+                B.strides[0],
+                C.addresses()[tile_P*i, tile_R*j],
+                C.strides[0],
+                *pack_unpack('f', 'I', alpha, beta),
+            ]
+
+        unif_params = drv.alloc((thread, len(block_2x4_params(0,0))), dtype = 'uint32')
+        for th in range(thread):
+            unif_params[th] = block_2x4_params(th // 4, th % 4)
+
+        unif = drv.alloc(2, dtype = 'uint32')
+        unif[0] = unif_params.addresses()[0,0]
+        unif[1] = unif_params.shape[1]
 
         start = getsec()
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, unif.addresses()[0], thread = thread)
         time_gpu = getsec() - start
+
+        np.set_printoptions(threshold=np.inf)
+        # print(C)
+        # print(C-C_ref)
 
         def Gflops(sec):
             return (2 * P * Q * R + 3 * P * R) / sec * 1e-9
