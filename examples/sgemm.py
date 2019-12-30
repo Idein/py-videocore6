@@ -217,12 +217,16 @@ def sgemm_rnn_naive():
         np.random.seed(0)
         alpha = np.random.randn()
         beta = np.random.randn()
-        A[:] = np.random.randn(P, Q)
-        B[:] = np.random.randn(Q, R)
-        C[:] = np.random.randn(P, R)
+        A_ref = np.random.randn(*A.shape).astype(A.dtype)
+        B_ref = np.random.randn(*B.shape).astype(B.dtype)
+        C_ref = np.random.randn(*C.shape).astype(C.dtype)
+
+        A[:] = A_ref
+        B[:] = B_ref
+        C[:] = C_ref
 
         start = getsec()
-        C_ref = alpha * A.dot(B) + beta * C
+        C_ref[:] = alpha * A_ref.dot(B_ref) + beta * C_ref
         time_ref = getsec() - start
 
         def block_2x4_params(i, j):
