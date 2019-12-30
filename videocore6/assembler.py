@@ -920,13 +920,18 @@ class Branch(Instruction):
 
         self.addr = None
 
-        if isinstance(src, Register) and src.name.startswith('rf'):
+        if isinstance(src, Register) and src.magic == 0:
+            # Branch to reg
             self.bdi = 3
-            self.raddr_a = int(src[2:])
+            self.raddr_a = src.waddr
         elif isinstance(src, Reference):
             # Branch to label
             self.bdi = 1
             self.addr_label = src
+        elif isinstance(src, int):
+            # Branch to imm
+            self.bdi = 1
+            self.addr = src
         else:
             raise AssembleError('Invalid src object')
 
@@ -934,6 +939,10 @@ class Branch(Instruction):
 
         if self.addr_label is not None:
             addr = int_to_uint((int(self.addr_label) - self.serial - 4) * 8)
+        elif self.addr is not None:
+            addr = self.addr
+        else:
+            addr = 0
 
         return 0 \
             | (0b10 << 56) \
