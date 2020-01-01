@@ -902,7 +902,7 @@ class ALU(Instruction):
 
 class Branch(Instruction):
 
-    def __init__(self, asm, opr, src, *, cond):
+    def __init__(self, asm, opr, src, *, cond, absolute=False):
         super(Branch, self).__init__(asm)
 
         self.cond_name = cond
@@ -917,16 +917,38 @@ class Branch(Instruction):
         }[self.cond_name]
         self.raddr_a = None
         self.addr_label = None
-
         self.addr = None
 
-        if isinstance(src, Register) and src.name.startswith('rf'):
+        self.ub = 0
+        self.bdu = 1
+
+        if isinstance(src, Register) and src.magic == 0:
+            # Branch to reg
             self.bdi = 3
-            self.raddr_a = int(src[2:])
+            self.raddr_a = src.waddr
         elif isinstance(src, Reference):
             # Branch to label
             self.bdi = 1
             self.addr_label = src
+        elif isinstance(src, int):
+            # Branch to imm
+            self.bdi = 0 if absolute else 1
+            self.addr = src
+        else:
+            raise AssembleError('Invalid src object')
+
+    def unif_addr(self, src=None, absolute=False):
+        self.ub = 1
+        self.bdu = 1
+        if src is None:
+            self.bdu = 0 if absolute else 1
+        elif isinstance(src, Register) and src.magic == 0:
+            # Branch to reg
+            self.bdu = 3
+            if self.raddr_a is None or self.raddr_a == src.waddr:
+                self.raddr_a = src.waddr
+            else:
+                raise AssembleError(f'Conflict registers')
         else:
             raise AssembleError('Invalid src object')
 
@@ -934,12 +956,18 @@ class Branch(Instruction):
 
         if self.addr_label is not None:
             addr = int_to_uint((int(self.addr_label) - self.serial - 4) * 8)
+        elif self.addr is not None:
+            addr = self.addr
+        else:
+            addr = 0
 
         return 0 \
             | (0b10 << 56) \
             | (((addr & ((1 << 24) - 1)) >> 3) << 35) \
             | (self.cond_br << 32) \
             | ((addr >> 24) << 24) \
+            | (self.bdu << 15) \
+            | (self.ub << 14) \
             | (self.bdi << 12) \
             | ((self.raddr_a if self.raddr_a is not None else 0) << 6)
 
