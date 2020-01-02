@@ -72,6 +72,54 @@ class Memory(object):
         self.buffer = None
 
 
+class Dispatcher(object):
+
+    def __init__(self, drm, bo_handles, timeout_sec=10):
+        self.drm = drm
+        self.bo_handles = bo_handles
+        self.timeout_sec = timeout_sec
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, ex_type, ex_value, trace):
+        for bo_handle in self.bo_handles:
+            self.drm.v3d_wait_bo(bo_handle,
+                                 timeout_ns=int(self.timeout_sec / 1e-9))
+
+    def dispatch(self, code, uniforms=None, workgroup=(16, 1, 1), wgs_per_sg=16, thread=1):
+
+        wg_x, wg_y, wg_z = workgroup
+        wg_size = wg_x * wg_y * wg_z
+
+        def roundup(n, d):
+            return (n + d - 1) // d
+
+        self.drm.v3d_submit_csd(
+            cfg=[
+                # WGS X, Y, Z and settings
+                wg_x << 16,
+                wg_y << 16,
+                wg_z << 16,
+                ((roundup(wgs_per_sg * wg_size, 16) - 1) << 12) |
+                (wgs_per_sg << 8) |
+                (wg_size & 0xff),
+                # Number of batches minus 1
+                thread - 1,
+                # Shader address, pnan, singleseg, threading
+                code.addresses()[0],
+                # Uniforms address
+                uniforms if uniforms is not None else 0,
+            ],
+            # Not used in the driver.
+            coef=[0, 0, 0, 0],
+            bo_handles=self.bo_handles.ctypes.data,
+            bo_handle_count=len(self.bo_handles),
+            in_sync=0,
+            out_sync=0,
+        )
+
+
 class Driver(object):
 
     def __init__(self, *,
@@ -170,39 +218,9 @@ class Driver(object):
 
         return code
 
+    def compute_shader_dispatcher(self, timeout_sec=10):
+        return Dispatcher(self.drm, self.bo_handles, timeout_sec=timeout_sec)
+
     def execute(self, code, uniforms=None, timeout_sec=10, workgroup=(16, 1, 1), wgs_per_sg=16, thread=1):
-
-        wg_x, wg_y, wg_z = workgroup
-        wg_size = wg_x * wg_y * wg_z
-
-        def roundup(n, d):
-            return (n + d - 1) // d
-
-        self.drm.v3d_submit_csd(
-            cfg=[
-                # WGS X, Y, Z and settings
-                wg_x << 16,
-                wg_y << 16,
-                wg_z << 16,
-                ((roundup(wgs_per_sg * wg_size, 16) - 1) << 12) |
-                (wgs_per_sg << 8) |
-                (wg_size & 0xff),
-                # Number of batches minus 1
-                thread - 1,
-                # Shader address, pnan, singleseg, threading
-                code.addresses()[0],
-                # Uniforms address
-                uniforms if uniforms is not None else 0,
-            ],
-            # Not used in the driver.
-            coef=[0, 0, 0, 0],
-            bo_handles=self.bo_handles.ctypes.data,
-            bo_handle_count=len(self.bo_handles),
-            in_sync=0,
-            out_sync=0,
-        )
-
-        # XXX: Separate function
-        for bo_handle in self.bo_handles:
-            self.drm.v3d_wait_bo(bo_handle,
-                                 timeout_ns=int(timeout_sec / 1e-9))
+        with self.compute_shader_dispatcher(timeout_sec) as csd:
+            csd.dispatch(code, uniforms=uniforms, workgroup=workgroup, wgs_per_sg=wgs_per_sg, thread=thread)
