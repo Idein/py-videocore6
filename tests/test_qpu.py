@@ -160,3 +160,47 @@ def test_tmu_read():
         drv.execute(code, unif.addresses()[0])
 
         assert all(data == range(1, n * 16 + 1))
+
+
+@qpu
+def qpu_write_N(asm, N):
+
+    eidx(r0, sig = ldunif)
+    shl(r0, r0, 2)
+    mov(tmud, N)
+    add(tmua, r5, r0)
+    tmuwt()
+
+    nop(sig = thrsw)
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop()
+
+
+def test_multiple_dispatch():
+    print()
+
+    n = 4096
+
+    with Driver(data_area_size = n * 16 * 4 + 2 * 4) as drv:
+
+        codeA = drv.program(lambda asm: qpu_write_N(asm, 2))
+        codeB = drv.program(lambda asm: qpu_write_N(asm, 3))
+        data = drv.alloc((2, 16), dtype = 'uint32')
+        unif = drv.alloc(2, dtype = 'uint32')
+
+        data[:] = 0
+        unif[:] = data.addresses()[:,0]
+
+        start = time.time()
+        with drv.compute_shader_dispatcher() as csd:
+            csd.dispatch(codeA, unif.addresses()[0])
+            csd.dispatch(codeB, unif.addresses()[1])
+        end = time.time()
+
+        assert (data[0] == 2).all()
+        assert (data[1] == 3).all()
