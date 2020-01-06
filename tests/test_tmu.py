@@ -2,48 +2,7 @@
 import time
 from videocore6.driver import Driver
 from videocore6.assembler import qpu
-
-
-@qpu
-def qpu_clock(asm):
-
-    nop(sig = ldunif)
-
-    with loop as l:
-        sub(r5, r5, 1, cond = 'pushn')
-        l.b(cond = 'anyna')
-        nop()
-        nop()
-        nop()
-
-    nop(sig = thrsw)
-    nop(sig = thrsw)
-    nop()
-    nop()
-    nop(sig = thrsw)
-    nop()
-    nop()
-    nop()
-
-
-def test_clock():
-    print()
-
-    with Driver() as drv:
-
-        f = pow(2, 25)
-
-        code = drv.program(qpu_clock)
-        unif = drv.alloc(1, dtype = 'uint32')
-
-        unif[0] = f
-
-        start = time.time()
-        drv.execute(code, unif.addresses()[0])
-        end = time.time()
-
-        print(f'{end - start} sec')
-        print(f'{f * 5 / (end - start) / 1000 / 1000 * 4} MHz')
+import numpy as np
 
 
 @qpu
