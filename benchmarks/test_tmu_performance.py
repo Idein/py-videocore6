@@ -21,7 +21,7 @@ def qpu_tmu_load(asm, nops):
     nop()
     nop()
 
-    eidx(r0)
+    tidx(r0)
     shr(r0, r0, 2)
     band(r0, r0, 0b1111, cond = 'pushz')
     b(R.done, cond = 'allna')
@@ -79,7 +79,7 @@ def test_tmu_load():
 
         with Driver() as drv:
 
-            loop = 2**14
+            loop = 2**15
 
             X = drv.alloc((16, loop) if trans else (loop, 16), dtype = 'float32')
             Y = drv.alloc(16, dtype = 'float32')
@@ -93,14 +93,14 @@ def test_tmu_load():
             unif[4] = Y.addresses()[0]
             unif[5] = done.addresses()[0]
 
-            results = np.zeros((64, 10), dtype = 'float32')
+            results = np.zeros((24, 10), dtype = 'float32')
 
             fig = plt.figure()
             ax = fig.add_subplot(1,1,1)
             ax.set_title(f'TMU load latency (stride=({unif[2]},{unif[3]}))')
             ax.set_xlabel('# of nop (between request and load signal)')
             ax.set_ylabel('sec')
-            ax.set_xlim([0,64])
+            ax.set_xlim([0,results.shape[0]])
             ax.set_ylim([0,0.01])
 
             print()
@@ -117,7 +117,7 @@ def test_tmu_load():
                         done[:] = 0
 
                         start = time.time()
-                        csd.dispatch(code, unif.addresses()[0], thread=8)
+                        csd.dispatch(code, unif.addresses()[0], thread = 8)
                         bench.wait_address(done)
                         end = time.time()
 
@@ -127,6 +127,6 @@ def test_tmu_load():
 
                 ax.scatter(np.zeros(results.shape[1])+nops, results[nops], s=1, c='blue')
 
-                print('{:4}/{}\t{}'.format(nops, results.shape[0], np.sum(results[nops]) / results.shape[1]))
+                print('{:4}/{}\t{:.9f}'.format(nops, results.shape[0], np.sum(results[nops]) / results.shape[1]))
 
             fig.savefig(f'tmu_load_performance_{unif[2]}_{unif[3]}.png')
