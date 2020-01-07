@@ -128,7 +128,7 @@ def test_tmu_load_1_slot_1_qpu():
                 print('{:4}/{}\t{:.9f}'.format(nops, results.shape[0], np.sum(results[nops]) / results.shape[1]))
 
             ax.set_xlim(0, results.shape[0])
-            fig.savefig(f'tmu_load_1_slot_1_qpu_{unif[2]}_{unif[3]}.png')
+            fig.savefig(f'benchmarks/tmu_load_1_slot_1_qpu_{unif[2]}_{unif[3]}.png')
 
 
 @qpu
@@ -239,7 +239,7 @@ def test_tmu_load_2_slot_1_qpu():
             ax.set_ylabel('sec')
 
             print()
-            for nops in range(256-32, results.shape[0]):
+            for nops in range(results.shape[0]):
 
                 code = drv.program(lambda asm: qpu_tmu_load_2_slot_1_qpu(asm, nops))
 
@@ -266,5 +266,4 @@ def test_tmu_load_2_slot_1_qpu():
 
                 print('{:4}/{}\t{:.9f}'.format(nops, results.shape[0], np.sum(results[nops]) / results.shape[1]))
 
-            ax.set_xlim(256-32, results.shape[0])
-            fig.savefig(f'tmu_load_2_slot_1_qpu_{unif[2]}_{unif[3]}.png')
+            fig.savefig(f'benchmarks/tmu_load_2_slot_1_qpu_{unif[2]}_{unif[3]}.png')
