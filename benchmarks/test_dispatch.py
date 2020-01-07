@@ -78,9 +78,9 @@ def test_multiple_dispatch_delay():
 
         print
         print(f'API wait after {data.shape[0]} dispatch: {ref_end - ref_start:.6f} sec')
-        print(f'pooling wait for each {data.shape[0]} dispatch:')
+        print(f'polling wait for each {data.shape[0]} dispatch:')
         print(f'    total: {np.sum(naive_results):.6f} sec')
         print(f'    details: {" ".join([f"{t:.6f}" for t in naive_results])}')
-        print(f'pooling wait for each {data.shape[0]} dispatch with between sleep:')
+        print(f'polling wait for each {data.shape[0]} dispatch with between sleep:')
         print(f'    total: {np.sum(sleep_results):.6f} sec + sleep...')
         print(f'    details: {" ".join([f"{t:.6f}" for t in sleep_results])}')
