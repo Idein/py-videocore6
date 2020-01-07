@@ -42,7 +42,6 @@ def qpu_tmu_write(asm):
 
 
 def test_tmu_write():
-    print()
 
     n = 4096
 
@@ -101,7 +100,6 @@ def qpu_tmu_read(asm):
 
 
 def test_tmu_read():
-    print()
 
     n = 4096
 
@@ -119,3 +117,54 @@ def test_tmu_read():
         drv.execute(code, unif.addresses()[0])
 
         assert all(data == range(1, n * 16 + 1))
+
+
+# VC4 TMU cache & DMA break memory consistency.
+# How about VC6 TMU ?
+@qpu
+def qpu_tmu_keeps_memory_consistency(asm):
+
+    nop(sig = ldunifrf(r0))
+
+    mov(tmua, r0, sig = thrsw)
+    nop()
+    nop()
+    nop(sig = ldtmu(r1))
+
+    add(tmud, r1, 1)
+    mov(tmua, r0)
+    tmuwt()
+
+    mov(tmua, r0, sig = thrsw)
+    nop()
+    nop()
+    nop(sig = ldtmu(r1))
+
+    add(tmud, r1, 1)
+    mov(tmua, r0)
+    tmuwt()
+
+    nop(sig = thrsw)
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop()
+
+def test_tmu_keeps_memory_consistency():
+
+    with Driver() as drv:
+
+        code = drv.program(qpu_tmu_keeps_memory_consistency)
+        data = drv.alloc(16, dtype = 'uint32')
+        unif = drv.alloc(3, dtype = 'uint32')
+
+        data[:] = 1
+        unif[0] = data.addresses()[0]
+
+        drv.execute(code, unif.addresses()[0])
+
+        assert (data[0] == 3).all()
+        assert (data[1:] == 1).all()
