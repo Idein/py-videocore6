@@ -130,7 +130,6 @@ def test_tmu_load_1_slot_1_qpu():
             ax.set_xlim(0, results.shape[0])
             fig.savefig(f'benchmarks/tmu_load_1_slot_1_qpu_{unif[2]}_{unif[3]}.png')
 
-
 @qpu
 def qpu_tmu_load_2_slot_1_qpu(asm, nops):
 
@@ -148,7 +147,7 @@ def qpu_tmu_load_2_slot_1_qpu(asm, nops):
     tidx(r0)
     shr(r0, r0, 2)
     band(r0, r0, 0b0011, cond = 'pushz')
-    b(R.done, cond = 'allna')
+    b(R.skip_bench, cond = 'allna')
     nop()
     nop()
     nop()
@@ -189,15 +188,23 @@ def qpu_tmu_load_2_slot_1_qpu(asm, nops):
     mov(tmua, rf4)
     tmuwt()
 
-    L.done
+    L.skip_bench
 
     barrierid(syncb, sig = thrsw)
     nop()
     nop()
 
+    tidx(r0)
+    shr(r0, r0, 2)
+    band(r0, r0, 0b1111, cond = 'pushz')
+    b(R.skip_done, cond = 'allna')
+    nop()
+    nop()
+    nop()
     mov(tmud, 1)
     mov(tmua, rf5)
     tmuwt()
+    L.skip_done
 
     nop(sig = thrsw)
     nop(sig = thrsw)
@@ -208,11 +215,11 @@ def qpu_tmu_load_2_slot_1_qpu(asm, nops):
     nop()
     nop()
 
-def test_tmu_load_2_slot_1_qpu():
+def test_tmu_load_2_slot_1_qpu(_min_nops, _max_nops, name):
 
     bench = BenchHelper('benchmarks/libbench_helper.so')
 
-    for trans in [True]:
+    for trans, min_nops, max_nops in [(False, 0, 64), (True, 128-32, 128+32)]:
 
         with Driver() as drv:
 
@@ -230,7 +237,7 @@ def test_tmu_load_2_slot_1_qpu():
             unif[4] = Y.addresses()[0,0]
             unif[5] = done.addresses()[0]
 
-            results = np.zeros((256+32, 10), dtype = 'float32')
+            results = np.zeros((max_nops, 10), dtype = 'float32')
 
             fig = plt.figure()
             ax = fig.add_subplot(1,1,1)
@@ -239,7 +246,7 @@ def test_tmu_load_2_slot_1_qpu():
             ax.set_ylabel('sec')
 
             print()
-            for nops in range(results.shape[0]):
+            for nops in range(min_nops, results.shape[0]):
 
                 code = drv.program(lambda asm: qpu_tmu_load_2_slot_1_qpu(asm, nops))
 
