@@ -251,7 +251,7 @@ def test_branch_abs_reg():
 
 # branch (destination from link_reg)
 @qpu
-def qpu_branch_link_reg(asm, set_subroutine_link):
+def qpu_branch_link_reg(asm, set_subroutine_link, use_link_reg_direct):
 
     eidx(r0, sig = ldunifrf(rf0))
     nop(sig = ldunifrf(rf1))
@@ -267,9 +267,9 @@ def qpu_branch_link_reg(asm, set_subroutine_link):
     mov(rf2, 0)
     mov(rf3, 0)
     b(R.init_link, cond = 'always', set_link = True)
-    nop()
-    nop()
-    nop()
+    nop() # delay slot
+    nop() # delay slot
+    nop() # delay slot
     L.init_link
 
     # subroutine returns to here if set_subroutine_link is False.
@@ -278,9 +278,9 @@ def qpu_branch_link_reg(asm, set_subroutine_link):
     # jump to subroutine once.
     mov(null, rf2, cond = 'pushz')
     b(R.subroutine, cond = 'alla', set_link = set_subroutine_link)
-    mov(rf2, 1)
-    nop()
-    nop()
+    mov(rf2, 1) # delay slot
+    nop()       # delay slot
+    nop()       # delay slot
 
     # subroutine returns to here if set_subroutine_link is True.
     shl(r1, 4, 4)
@@ -304,33 +304,38 @@ def qpu_branch_link_reg(asm, set_subroutine_link):
     mov(tmua, rf1).add(rf1, rf1, r1)
     tmuwt()
 
-    b(link, cond = 'always')
-    nop()
-    nop()
-    nop()
+    if use_link_reg_direct:
+        b(link, cond = 'always')
+    else:
+        lr(rf32) # lr instruction reads link register
+        b(rf32, cond = 'always')
+    nop() # delay slot
+    nop() # delay slot
+    nop() # delay slot
 
 def test_branch_link_reg():
 
     for set_subroutine_link, expected in [(False, 2), (True, 1)]:
-        with Driver() as drv:
+        for use_link_reg_direct in [False, True]:
+            with Driver() as drv:
 
-            code = drv.program(lambda asm: qpu_branch_link_reg(asm, set_subroutine_link))
-            X = drv.alloc(16, dtype = 'uint32')
-            Y = drv.alloc((2, 16), dtype = 'uint32')
-            unif = drv.alloc(2, dtype = 'uint32')
+                code = drv.program(lambda asm: qpu_branch_link_reg(asm, set_subroutine_link, use_link_reg_direct))
+                X = drv.alloc(16, dtype = 'uint32')
+                Y = drv.alloc((2, 16), dtype = 'uint32')
+                unif = drv.alloc(2, dtype = 'uint32')
 
-            X[:] = (np.random.randn(16) * 1024).astype('uint32')
-            Y[:] = 0.0
+                X[:] = (np.random.randn(16) * 1024).astype('uint32')
+                Y[:] = 0.0
 
-            unif[0] = X.addresses()[0]
-            unif[1] = Y.addresses()[0,0]
+                unif[0] = X.addresses()[0]
+                unif[1] = Y.addresses()[0,0]
 
-            start = time.time()
-            drv.execute(code, unif.addresses()[0])
-            end = time.time()
+                start = time.time()
+                drv.execute(code, unif.addresses()[0])
+                end = time.time()
 
-            assert (Y[0] == X).all()
-            assert (Y[1] == expected).all()
+                assert (Y[0] == X).all()
+                assert (Y[1] == expected).all()
 
 
 # uniform branch (destination from uniform relative value)
