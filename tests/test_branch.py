@@ -249,6 +249,90 @@ def test_branch_abs_reg():
         assert (Y == 1).all()
 
 
+# branch (destination from link_reg)
+@qpu
+def qpu_branch_link_reg(asm, set_subroutine_link):
+
+    eidx(r0, sig = ldunifrf(rf0))
+    nop(sig = ldunifrf(rf1))
+    shl(r0, r0, 2)
+    add(rf0, rf0, r0)
+    add(rf1, rf1, r0)
+
+    mov(tmua, rf0, sig = thrsw)
+    nop()
+    nop()
+    nop(sig = ldtmu(r2))
+
+    mov(rf2, 0)
+    mov(rf3, 0)
+    b(R.init_link, cond = 'always', set_link = True)
+    nop()
+    nop()
+    nop()
+    L.init_link
+
+    # subroutine returns to here if set_subroutine_link is False.
+    add(rf3, rf3, 1)
+
+    # jump to subroutine once.
+    mov(null, rf2, cond = 'pushz')
+    b(R.subroutine, cond = 'alla', set_link = set_subroutine_link)
+    mov(rf2, 1)
+    nop()
+    nop()
+
+    # subroutine returns to here if set_subroutine_link is True.
+    shl(r1, 4, 4)
+    mov(tmud, rf3) # rf3 will be 1 if set_subroutine_link, else 2.
+    mov(tmua, rf1).add(rf1, rf1, r1)
+    tmuwt()
+
+    nop(sig = thrsw)
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop()
+
+    L.subroutine
+
+    shl(r1, 4, 4)
+    mov(tmud, r2)
+    mov(tmua, rf1).add(rf1, rf1, r1)
+    tmuwt()
+
+    b(link, cond = 'always')
+    nop()
+    nop()
+    nop()
+
+def test_branch_link_reg():
+
+    for set_subroutine_link, expected in [(False, 2), (True, 1)]:
+        with Driver() as drv:
+
+            code = drv.program(lambda asm: qpu_branch_link_reg(asm, set_subroutine_link))
+            X = drv.alloc(16, dtype = 'uint32')
+            Y = drv.alloc((2, 16), dtype = 'uint32')
+            unif = drv.alloc(2, dtype = 'uint32')
+
+            X[:] = (np.random.randn(16) * 1024).astype('uint32')
+            Y[:] = 0.0
+
+            unif[0] = X.addresses()[0]
+            unif[1] = Y.addresses()[0,0]
+
+            start = time.time()
+            drv.execute(code, unif.addresses()[0])
+            end = time.time()
+
+            assert (Y[0] == X).all()
+            assert (Y[1] == expected).all()
+
+
 # uniform branch (destination from uniform relative value)
 @qpu
 def qpu_uniform_branch_rel(asm):
