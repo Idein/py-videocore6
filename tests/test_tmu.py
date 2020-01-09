@@ -2,48 +2,7 @@
 import time
 from videocore6.driver import Driver
 from videocore6.assembler import qpu
-
-
-@qpu
-def qpu_clock(asm):
-
-    nop(sig = ldunif)
-
-    with loop as l:
-        sub(r5, r5, 1, cond = 'pushn')
-        l.b(cond = 'anyna')
-        nop()
-        nop()
-        nop()
-
-    nop(sig = thrsw)
-    nop(sig = thrsw)
-    nop()
-    nop()
-    nop(sig = thrsw)
-    nop()
-    nop()
-    nop()
-
-
-def test_clock():
-    print()
-
-    with Driver() as drv:
-
-        f = pow(2, 25)
-
-        code = drv.program(qpu_clock)
-        unif = drv.alloc(1, dtype = 'uint32')
-
-        unif[0] = f
-
-        start = time.time()
-        drv.execute(code, unif.addresses()[0])
-        end = time.time()
-
-        print(f'{end - start} sec')
-        print(f'{f * 5 / (end - start) / 1000 / 1000 * 4} MHz')
+import numpy as np
 
 
 @qpu
@@ -160,47 +119,3 @@ def test_tmu_read():
         drv.execute(code, unif.addresses()[0])
 
         assert all(data == range(1, n * 16 + 1))
-
-
-@qpu
-def qpu_write_N(asm, N):
-
-    eidx(r0, sig = ldunif)
-    shl(r0, r0, 2)
-    mov(tmud, N)
-    add(tmua, r5, r0)
-    tmuwt()
-
-    nop(sig = thrsw)
-    nop(sig = thrsw)
-    nop()
-    nop()
-    nop(sig = thrsw)
-    nop()
-    nop()
-    nop()
-
-
-def test_multiple_dispatch():
-    print()
-
-    n = 4096
-
-    with Driver(data_area_size = n * 16 * 4 + 2 * 4) as drv:
-
-        codeA = drv.program(lambda asm: qpu_write_N(asm, 2))
-        codeB = drv.program(lambda asm: qpu_write_N(asm, 3))
-        data = drv.alloc((2, 16), dtype = 'uint32')
-        unif = drv.alloc(2, dtype = 'uint32')
-
-        data[:] = 0
-        unif[:] = data.addresses()[:,0]
-
-        start = time.time()
-        with drv.compute_shader_dispatcher() as csd:
-            csd.dispatch(codeA, unif.addresses()[0])
-            csd.dispatch(codeB, unif.addresses()[1])
-        end = time.time()
-
-        assert (data[0] == 2).all()
-        assert (data[1] == 3).all()
