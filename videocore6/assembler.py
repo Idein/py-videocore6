@@ -28,6 +28,7 @@ class Assembly(list):
     def _gen_ns_label_name(self, name):
         return '.'.join(self.label_name_spaces + [name])
 
+
 class LabelNameSpace(object):
     'Label namespace controller.'
 
