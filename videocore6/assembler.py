@@ -900,9 +900,15 @@ class ALU(Instruction):
             | raddr.pack()
 
 
+class Link(object):
+
+    def __init__(self):
+        pass
+
+
 class Branch(Instruction):
 
-    def __init__(self, asm, opr, src, *, cond, absolute=False):
+    def __init__(self, asm, opr, src, *, cond, absolute=False, set_link=False):
         super(Branch, self).__init__(asm)
 
         self.cond_name = cond
@@ -918,11 +924,15 @@ class Branch(Instruction):
         self.raddr_a = None
         self.addr_label = None
         self.addr = None
+        self.set_link = set_link
 
         self.ub = 0
         self.bdu = 1
 
-        if isinstance(src, Register) and src.magic == 0:
+        if isinstance(src, Link):
+            # Branch to link_reg
+            self.bdi = 2
+        elif isinstance(src, Register) and src.magic == 0:
             # Branch to reg
             self.bdi = 3
             self.raddr_a = src.waddr
@@ -961,11 +971,17 @@ class Branch(Instruction):
         else:
             addr = 0
 
+        set_link = 1 if self.set_link else 0
+
+        msfign = 0b00
+
         return 0 \
             | (0b10 << 56) \
             | (((addr & ((1 << 24) - 1)) >> 3) << 35) \
             | (self.cond_br << 32) \
             | ((addr >> 24) << 24) \
+            | (set_link << 23) \
+            | (msfign << 21) \
             | (self.bdu << 15) \
             | (self.ub << 14) \
             | (self.bdi << 12) \
@@ -1081,6 +1097,7 @@ def qpu(func):
         g['R'] = Reference(asm)
         g['loop'] = LoopHelper(asm)
         g['b'] = functools.partial(Branch, asm, 'b')
+        g['link'] = Link()
         g['raw'] = functools.partial(Raw, asm)
         for mul_op in MulALUOp.OPERATIONS.keys():
             g[mul_op] = functools.partial(ALU, asm, mul_op)
