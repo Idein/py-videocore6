@@ -12,6 +12,7 @@ class Assembly(list):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.labels = {}
+        self.label_name_spaces = []
 
     def _gen_unused_label(self, label_format='{}'):
         n = len(self.labels)
@@ -24,6 +25,25 @@ class Assembly(list):
 
         return label_format.format(n)
 
+    def _gen_ns_label_name(self, name):
+        return '.'.join(self.label_name_spaces + [name])
+
+
+class LabelNameSpace(object):
+    'Label namespace controller.'
+
+    def __init__(self, asm, name):
+        super(LabelNameSpace, self).__init__()
+        self.asm = asm
+        self.name = name
+
+    def __enter__(self):
+        self.asm.label_name_spaces.append(self.name)
+        return self
+
+    def __exit__(self, exception_type, exception_value, traceback):
+        self.asm.label_name_spaces.pop()
+
 
 class Label(object):
 
@@ -33,7 +53,7 @@ class Label(object):
     def __getattr__(self, name):
         if name in self.asm.labels:
             raise AssembleError(f'Label is duplicated: {name}')
-        self.asm.labels[name] = len(self.asm)
+        self.asm.labels[self.asm._gen_ns_label_name(name)] = len(self.asm)
 
 
 class Reference(object):
@@ -43,7 +63,7 @@ class Reference(object):
         self.name = name
 
     def __getattr__(self, name):
-        return Reference(self.asm, name)
+        return Reference(self.asm, self.asm._gen_ns_label_name(name))
 
     def __int__(self):
         return self.asm.labels[self.name]
@@ -1099,6 +1119,7 @@ def qpu(func):
         g['b'] = functools.partial(Branch, asm, 'b')
         g['link'] = Link()
         g['raw'] = functools.partial(Raw, asm)
+        g['namespace'] = functools.partial(LabelNameSpace, asm)
         for mul_op in MulALUOp.OPERATIONS.keys():
             g[mul_op] = functools.partial(ALU, asm, mul_op)
         for add_op in AddALUOp.OPERATIONS.keys():
