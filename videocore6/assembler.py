@@ -15,9 +15,9 @@ class Assembly(list):
         self.label_name_spaces = []
 
     def _gen_unused_label(self, label_format='{}'):
-        n = len(self.labels)
+        n = 0
         label = label_format.format(n)
-        while label in self.labels:
+        while self._gen_ns_label_name(label) in self.labels:
             n += 1
             next_label = label_format.format(n)
             assert label != next_label, 'Bug: Invalid label format'
@@ -51,19 +51,20 @@ class Label(object):
         self.asm = asm
 
     def __getattr__(self, name):
-        if name in self.asm.labels:
+        ns_name = self.asm._gen_ns_label_name(name)
+        if ns_name in self.asm.labels:
             raise AssembleError(f'Label is duplicated: {name}')
-        self.asm.labels[self.asm._gen_ns_label_name(name)] = len(self.asm)
+        self.asm.labels[ns_name] = len(self.asm)
 
 
 class Reference(object):
 
     def __init__(self, asm, name=None):
         self.asm = asm
-        self.name = name
+        self.name = self.asm._gen_ns_label_name(name) if name is not None else None
 
     def __getattr__(self, name):
-        return Reference(self.asm, self.asm._gen_ns_label_name(name))
+        return Reference(self.asm, name)
 
     def __int__(self):
         return self.asm.labels[self.name]

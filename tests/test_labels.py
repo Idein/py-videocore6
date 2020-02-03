@@ -44,6 +44,15 @@ def qpu_label_with_namespace(asm):
     L.test
     add(r0, r0, 1)
 
+    with namespace('ns3'):
+        b(R.test, cond = 'always')
+        nop()
+        nop()
+        nop()
+        add(r0, r0, 10)
+        L.test
+        add(r0, r0, 1)
+
     eidx(r1, sig = ldunifrf(rf2))
     shl(r1, r1, 2)
 
@@ -76,4 +85,4 @@ def test_label_with_namespace():
         drv.execute(code, unif.addresses()[0])
         end = time.time()
 
-        assert (data == 4).all()
+        assert (data == 5).all()
