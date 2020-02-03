@@ -2,7 +2,7 @@
 import sys
 import mmap
 from videocore6.drm_v3d import DRM_V3D
-from videocore6.assembler import Assembly
+from videocore6.assembler import assemble
 import numpy as np
 
 
@@ -190,16 +190,12 @@ class Driver(object):
 
     def dump_program(self, prog, *args, **kwargs):
         file = kwargs.pop('file') if 'file' in kwargs else sys.stdout
-        asm = Assembly()
-        prog(asm, *args, **kwargs)
-        for insn in asm:
-            print(f'{int(insn):#018x}', file=file)
+        for insn in assemble(prog, *args, **kwargs):
+            print(f'{insn:#018x}', file=file)
 
     def program(self, prog, *args, **kwargs):
 
-        asm = Assembly()
-        prog(asm, *args, **kwargs)
-        asm = [int(x) for x in asm]
+        asm = assemble(prog, *args, **kwargs)
 
         offset = self.code_pos
         code = Array(

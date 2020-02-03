@@ -1145,3 +1145,18 @@ def qpu(func):
             g[key] = value
 
     return decorator
+
+
+def _assemble(f, *args, **kwargs):
+    'Assemble QPU program to byte string.'
+    asm = Assembly()
+    f(asm, *args, **kwargs)
+    return asm
+
+
+def assemble(f, *args, **kwargs):
+    return list(map(int, _assemble(f, *args, **kwargs)))
+
+
+def get_label_positions(f, *args, **kwargs):
+    return {l: 8*n for l, n in _assemble(f, *args, **kwargs).labels.items()}
