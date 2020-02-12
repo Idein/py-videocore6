@@ -168,3 +168,60 @@ def test_tmu_keeps_memory_consistency():
 
         assert (data[0] == 3).all()
         assert (data[1:] == 1).all()
+
+
+@qpu
+def qpu_tmu_read_tmu_write_uniform_read(asm):
+
+    eidx(r0, sig = ldunifrf(rf0))
+    shl(r0, r0, 2)
+    add(rf0, rf0, r0, sig = ldunifrf(rf1))
+    add(rf1, rf1, r0)
+
+    mov(tmua, rf0, sig = thrsw)
+    nop()
+    nop()
+    nop(sig = ldtmu(r0)) # r0 = [1,...,1]
+
+    add(tmud, r0, 1)
+    mov(tmua, rf0)       # data = [2,...,2]
+    tmuwt()
+
+    b(R.set_unif_addr, cond = 'always').unif_addr(rf0) # unif_addr = data.addresses()[0]
+    nop()
+    nop()
+    nop()
+    L.set_unif_addr
+
+    nop(sig = ldunifrf(r0)) # r0 = [data[0],...,data[0]] = [2,...,2]
+
+    add(tmud, r0, 1)
+    mov(tmua, rf1)          # result = [3,...,3]
+    tmuwt()
+
+    nop(sig = thrsw)
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop()
+
+def test_tmu_read_tmu_write_uniform_read():
+
+    with Driver() as drv:
+
+        code = drv.program(qpu_tmu_read_tmu_write_uniform_read)
+        data = drv.alloc(16, dtype = 'uint32')
+        result = drv.alloc(16, dtype = 'uint32')
+        unif = drv.alloc(3, dtype = 'uint32')
+
+        data[:] = 1
+        unif[0] = data.addresses()[0]
+        unif[1] = result.addresses()[0]
+
+        drv.execute(code, unif.addresses()[0])
+
+        assert (data == 2).all()
+        assert (result == 2).all() # !? not 3 ?
