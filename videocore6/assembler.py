@@ -531,7 +531,7 @@ class ALURaddrs(object):
             if isinstance(self.b.rot, int):
                 raddr_b = pack_smimms_int(self.b.rot)
             if isinstance(self.b.rot, Register):
-                raddr_b = 0 # rotate by r5
+                raddr_b = 0  # rotate by r5
 
         return 0 \
             | (raddr_a << 6) \
