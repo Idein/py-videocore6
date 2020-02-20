@@ -87,6 +87,14 @@ def qpu_full_rotate(asm):
         mov(tmua, rf1)
         tmuwt().add(rf1, rf1, r3)
 
+    for i in range(-15, 16):
+        mov(r5, i)
+        nop() # require
+        nop().add(r1, r0, r0, sig = rot(i))
+        mov(tmud, r1)
+        mov(tmua, rf1)
+        tmuwt().add(rf1, rf1, r3)
+
     nop(sig = thrsw)
     nop(sig = thrsw)
     nop()
@@ -102,14 +110,14 @@ def test_full_rotate():
 
         code = drv.program(qpu_full_rotate)
         X = drv.alloc((16, ), dtype = 'int32')
-        Y = drv.alloc((len(range(-15, 16)), 16), dtype = 'int32')
+        Y = drv.alloc((2, len(range(-15, 16)), 16), dtype = 'int32')
         unif = drv.alloc(3, dtype = 'uint32')
 
         X[:] = np.arange(16)
         Y[:] = 0
 
         unif[0] = X.addresses()[0]
-        unif[1] = Y.addresses()[0,0]
+        unif[1] = Y.addresses()[0,0,0]
 
         start = time.time()
         drv.execute(code, unif.addresses()[0])
@@ -117,7 +125,7 @@ def test_full_rotate():
 
         expected = np.concatenate([X,X]) * 2
         for ix, rot in enumerate(range(-15, 16)):
-            assert (Y[ix] == expected[(-rot%16):(-rot%16)+16]).all()
+            assert (Y[:,ix] == expected[(-rot%16):(-rot%16)+16]).all()
 
 
 # rotate alias
@@ -147,6 +155,17 @@ def qpu_rotate_alias(asm):
         mov(tmua, rf1)
         tmuwt().add(rf1, rf1, r3)
 
+    for i in range(-15, 16):
+        mov(r5, i)
+        nop() # require
+        if i % 1 == 0:
+            rotate(r1, r0, r5)       # add alias
+        else:
+            nop().rotate(r1, r0, r5) # mul alias
+        mov(tmud, r1)
+        mov(tmua, rf1)
+        tmuwt().add(rf1, rf1, r3)
+
     nop(sig = thrsw)
     nop(sig = thrsw)
     nop()
@@ -162,14 +181,14 @@ def test_rotate_alias():
 
         code = drv.program(qpu_rotate_alias)
         X = drv.alloc((16, ), dtype = 'int32')
-        Y = drv.alloc((len(range(-15, 16)), 16), dtype = 'int32')
+        Y = drv.alloc((2, len(range(-15, 16)), 16), dtype = 'int32')
         unif = drv.alloc(3, dtype = 'uint32')
 
         X[:] = np.arange(16)
         Y[:] = 0
 
         unif[0] = X.addresses()[0]
-        unif[1] = Y.addresses()[0,0]
+        unif[1] = Y.addresses()[0,0,0]
 
         start = time.time()
         drv.execute(code, unif.addresses()[0])
@@ -177,7 +196,7 @@ def test_rotate_alias():
 
         expected = np.concatenate([X,X])
         for ix, rot in enumerate(range(-15, 16)):
-            assert (Y[ix] == expected[(-rot%16):(-rot%16)+16]).all()
+            assert (Y[:,ix] == expected[(-rot%16):(-rot%16)+16]).all()
 
 
 # rot signal with rfN source performs as a quad rotate
@@ -204,6 +223,14 @@ def qpu_quad_rotate(asm):
         mov(tmua, rf1)
         tmuwt().add(rf1, rf1, r3)
 
+    for i in range(-15, 16):
+        mov(r5, i)
+        nop() # require
+        nop().add(r1, rf32, rf32, sig = rot(r5))
+        mov(tmud, r1)
+        mov(tmua, rf1)
+        tmuwt().add(rf1, rf1, r3)
+
     nop(sig = thrsw)
     nop(sig = thrsw)
     nop()
@@ -219,14 +246,14 @@ def test_quad_rotate():
 
         code = drv.program(qpu_quad_rotate)
         X = drv.alloc((16, ), dtype = 'int32')
-        Y = drv.alloc((len(range(-15, 16)), 16), dtype = 'int32')
+        Y = drv.alloc((2, len(range(-15, 16)), 16), dtype = 'int32')
         unif = drv.alloc(3, dtype = 'uint32')
 
         X[:] = np.arange(16)
         Y[:] = 0
 
         unif[0] = X.addresses()[0]
-        unif[1] = Y.addresses()[0,0]
+        unif[1] = Y.addresses()[0,0,0]
 
         start = time.time()
         drv.execute(code, unif.addresses()[0])
@@ -234,7 +261,7 @@ def test_quad_rotate():
 
         expected = np.concatenate([X.reshape(4,4)]*2, axis=1)*2
         for ix, rot in enumerate(range(-15, 16)):
-            assert (Y[ix] == expected[:,(-rot%4):(-rot%4)+4].ravel()).all()
+            assert (Y[:,ix] == expected[:,(-rot%4):(-rot%4)+4].ravel()).all()
 
 
 # quad_rotate alias
@@ -264,6 +291,17 @@ def qpu_quad_rotate_alias(asm):
         mov(tmua, rf1)
         tmuwt().add(rf1, rf1, r3)
 
+    for i in range(-15, 16):
+        mov(r5, i)
+        nop() # require
+        if i % 1 == 0:
+            quad_rotate(r1, rf32, r5)       # add alias
+        else:
+            nop().quad_rotate(r1, rf32, r5) # mul alias
+        mov(tmud, r1)
+        mov(tmua, rf1)
+        tmuwt().add(rf1, rf1, r3)
+
     nop(sig = thrsw)
     nop(sig = thrsw)
     nop()
@@ -279,14 +317,14 @@ def test_quad_rotate_alias():
 
         code = drv.program(qpu_quad_rotate_alias)
         X = drv.alloc((16, ), dtype = 'int32')
-        Y = drv.alloc((len(range(-15, 16)), 16), dtype = 'int32')
+        Y = drv.alloc((2, len(range(-15, 16)), 16), dtype = 'int32')
         unif = drv.alloc(3, dtype = 'uint32')
 
         X[:] = np.arange(16)
         Y[:] = 0
 
         unif[0] = X.addresses()[0]
-        unif[1] = Y.addresses()[0,0]
+        unif[1] = Y.addresses()[0,0,0]
 
         start = time.time()
         drv.execute(code, unif.addresses()[0])
@@ -294,7 +332,7 @@ def test_quad_rotate_alias():
 
         expected = np.concatenate([X.reshape(4,4)]*2, axis=1)
         for ix, rot in enumerate(range(-15, 16)):
-            assert (Y[ix] == expected[:,(-rot%4):(-rot%4)+4].ravel()).all()
+            assert (Y[:,ix] == expected[:,(-rot%4):(-rot%4)+4].ravel()).all()
 
 
 # instruction with r5rep dst performs as a full broadcast
