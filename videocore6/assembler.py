@@ -528,7 +528,10 @@ class ALURaddrs(object):
         if isinstance(self.b, Register):
             raddr_b = self.b.waddr
         if isinstance(self.b, Signal):
-            raddr_b = pack_smimms_int(self.b.rot)
+            if isinstance(self.b.rot, int):
+                raddr_b = pack_smimms_int(self.b.rot)
+            if isinstance(self.b.rot, Register):
+                raddr_b = 0  # rotate by r5
 
         return 0 \
             | (raddr_a << 6) \
@@ -1044,6 +1047,8 @@ def _rotate_m(self, dst, src, rot, **kwargs):
     sigs.add(Instruction.SIGNALS['rot'](rot))
     if not isinstance(src, Register) or src.magic != 1:
         raise AssembleError('Invalid src object for rotate')
+    if not (isinstance(rot, int) or (isinstance(rot, Register) and rot.magic == 1 and rot.waddr == 5)):
+        raise AssembleError('Invalid rot object for rotate')
     return self.mov(dst, src, sig=sigs, **kwargs)
 
 
@@ -1058,6 +1063,8 @@ def _quad_rotate_m(self, dst, src, rot, **kwargs):
     sigs.add(Instruction.SIGNALS['rot'](rot))
     if not isinstance(src, Register) or src.magic != 0:
         raise AssembleError('Invalid src object for quad_rotate')
+    if not (isinstance(rot, int) or (isinstance(rot, Register) and rot.magic == 1 and rot.waddr == 5)):
+        raise AssembleError('Invalid rot object for rotate')
     return self.mov(dst, src, sig=sigs, **kwargs)
 
 
