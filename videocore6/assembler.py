@@ -150,14 +150,14 @@ class Signals(set):
     def add(self, sigs):
         if isinstance(sigs, WriteSignal):
             sig = sigs
-            raise AssembleError(f'"{sig}" requires destination register (ex. "{sig}(r0)")')
+            raise AssembleError(f'"{sig.name}" requires destination register (ex. "{sig.name}(r0)")')
         if isinstance(sigs, RotateSignal):
             sig = sigs
-            raise AssembleError(f'"{sig}" requires rotate number (ex. "{sig}(-1)")')
+            raise AssembleError(f'"{sig.name}" requires rotate number (ex. "{sig.name}(-1)")')
         elif isinstance(sigs, Signal):
             sig = sigs
             if sig.name in [s.name for s in self]:
-                raise AssembleError(f'Signal "{sig}" is duplicated')
+                raise AssembleError(f'Signal "{sig.name}" is duplicated')
             if sig.rot == 0:  # ignore rot(0)
                 return
             super(Signals, self).add(sig)
@@ -457,11 +457,11 @@ class ALURaddrs(object):
                 pass
             else:
                 if isinstance(self.b, (int, float)):
-                    raise AssembleError(f'Conflict small immediates {self.b} and signal {reg}')
+                    raise AssembleError(f'Conflict small immediates {self.b} and signal {sig.name}')
                 elif isinstance(self.b, Register):
-                    raise AssembleError(f'Conflict register {self.b} and signal {reg}')
+                    raise AssembleError(f'Conflict register {self.b} and signal {sig.name}')
                 elif isinstance(self.b, Signal):
-                    raise AssembleError(f'Conflict signal {self.b} and signal {reg}')
+                    raise AssembleError(f'Conflict signal {self.b} and signal {sig.name}')
                 else:
                     assert False, 'Bug: Lack of type exhaustivity'
         elif isinstance(reg, (int, float)):
@@ -472,11 +472,11 @@ class ALURaddrs(object):
                 pass
             else:
                 if isinstance(self.b, (int, float)):
-                    raise AssembleError(f'Conflict small immediates {self.b} and small immediates {reg}')
+                    raise AssembleError(f'Conflict small immediates {self.b} and small immediates {reg.name}')
                 elif isinstance(self.b, Register):
-                    raise AssembleError(f'Conflict register {self.b} and small immediates {reg}')
+                    raise AssembleError(f'Conflict register {self.b} and small immediates {reg.name}')
                 elif isinstance(self.b, Signal):
-                    raise AssembleError(f'Conflict signal {self.b} small immediates {reg}')
+                    raise AssembleError(f'Conflict signal {self.b} small immediates {reg.name}')
                 else:
                     assert False, 'Bug: Lack of type exhaustivity'
         else:
@@ -501,7 +501,7 @@ class ALURaddrs(object):
             elif reg.waddr < 6:
                 return
             else:
-                raise AssembleError(f'Invalid source register {reg}')
+                raise AssembleError(f'Invalid source register {reg.name}')
 
     def pack(self):
         raddr_a, raddr_b = 0, 0
