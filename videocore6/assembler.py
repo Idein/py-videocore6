@@ -320,6 +320,10 @@ class ALUConditions(object):
     def pack(self, sigs):
 
         if sigs.is_write():
+            if self.cond_add is not None:
+                raise AssembleError(f'Conflict conditional flags "{self.cond_add}" and write signal')
+            if self.cond_mul is not None:
+                raise AssembleError(f'Conflict conditional flags "{self.cond_mul}" and write signal')
             return sigs.write_address() << 46
 
         conds_push = {
