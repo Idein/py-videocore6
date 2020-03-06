@@ -50,10 +50,7 @@ def load_params(asm, thread, regs):
         if i % 16 == 0:
             mov(r5rep, r1)
             mov(regs[i], r5)
-        elif i - 1 == n:
-            rotate(r5rep, r1, - (i % 16))
-            mov(regs[i], r5)
-        elif i % 16 == 15:
+        elif i % 16 == 15 and i != n - 1:
             mov(tmua, r0, sig = thrsw).add(r0, r0, r3)
             rotate(r5rep, r1, - (i % 16))
             mov(regs[i], r5)
