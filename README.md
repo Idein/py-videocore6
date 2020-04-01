@@ -50,14 +50,19 @@ $ cd py-videocore6/
 $ nosetests -v -s
 ```
 
-## Running examples
-
-After installing `py-videocore6`:
+To run all tests including the ones which require root privilege:
 
 ```
-$ git clone https://github.com/Idein/py-videocore6.git
-$ cd py-videocore6/
-$ python3 examples/sgemm.py
+$ pip3 install --target dest . nose
+$ sudo PYTHONPATH=dest nosetests -v -s
+```
+
+## Running examples
+
+In the `py-videocore6` directory:
+
+```
+$ PYTHONPATH=. python3 examples/sgemm.py
 ==== sgemm example (123x567 times 567x512) ====
 numpy: 0.03433 sec, 2.086 Gflop/s
 QPU:   0.8327 sec, 0.08599 Gflop/s
@@ -69,3 +74,10 @@ Maximum relative error: 0.0
 
 Note that the current implementation of sgemm is seriously naive, and therefore
 the performance is low at least for now.
+
+```
+$ pip3 install --target dest .
+$ sudo PYTHONPATH=dest python3 examples/pctr_gpu_clock.py
+==== QPU clock measurement with performance counters ====
+500.535482 MHz
+```
