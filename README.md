@@ -50,6 +50,13 @@ $ cd py-videocore6/
 $ nosetests -v -s
 ```
 
+To run all tests including the ones which require root privilege:
+
+```
+$ pip3 install --target dest . nose
+$ sudo PYTHONPATH=dest nosetests -v -s
+```
+
 ## Running examples
 
 After installing `py-videocore6`:
