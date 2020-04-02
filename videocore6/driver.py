@@ -188,10 +188,12 @@ class Driver(object):
 
         return arr
 
-    def dump_program(self, prog, *args, **kwargs):
-        file = kwargs.pop('file') if 'file' in kwargs else sys.stdout
-        for insn in assemble(prog, *args, **kwargs):
+    def dump_code(self, code, *, file=sys.stdout):
+        for insn in code:
             print(f'{insn:#018x}', file=file)
+
+    def dump_program(self, prog, *args, file=sys.stdout, **kwargs):
+        self.dump_code(assemble(prog, *args, **kwargs), file=file)
 
     def program(self, prog, *args, **kwargs):
 
