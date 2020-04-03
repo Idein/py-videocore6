@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
 
 
-import struct
 from time import clock_gettime, CLOCK_MONOTONIC
 import numpy as np
+from videocore6 import pack_unpack
 from videocore6.driver import Driver
 from videocore6.assembler import qpu
-
-
-def pack_unpack(pack, unpack, *args):
-    return [struct.unpack(unpack, struct.pack(pack, _))[0] for _ in args]
 
 
 def getsec():
@@ -237,7 +233,7 @@ def sgemm_rnn_naive():
                 B.strides[0],
                 C.addresses()[tile_P*i, tile_R*j],
                 C.strides[0],
-                *pack_unpack('f', 'I', alpha, beta),
+                *pack_unpack('f', 'I', [alpha, beta]),
             ]
 
         unif_params = drv.alloc((thread, len(block_2x4_params(0,0))), dtype = 'uint32')
