@@ -1,6 +1,6 @@
 
 import functools
-from videocore6 import float_to_int, int_to_float, int_to_uint
+from videocore6 import pack_unpack
 
 
 class AssembleError(Exception):
@@ -514,14 +514,15 @@ class ALURaddrs(object):
             for i in range(16):
                 smimms_int[i] = i
                 smimms_int[i - 16] = i + 16
-                smimms_int[float_to_int(2 ** (i - 8))] = i + 32
+                smimms_int[pack_unpack('i', 'I', i - 16)] = i + 16
+                smimms_int[pack_unpack('f', 'I', 2 ** (i - 8))] = i + 32
             return smimms_int[x]
 
         def pack_smimms_float(x):
             smimms_float = {}
             for i in range(16):
                 # Denormal numbers
-                smimms_float[int_to_float(i)] = i
+                smimms_float[pack_unpack('I', 'f', i)] = i
                 smimms_float[2 ** (i - 8)] = i + 32
             return smimms_float[x]
 
@@ -993,7 +994,8 @@ class Branch(Instruction):
     def pack(self):
 
         if self.addr_label is not None:
-            addr = int_to_uint((int(self.addr_label) - self.serial - 4) * 8)
+            addr = pack_unpack('i', 'I',
+                               (int(self.addr_label) - self.serial - 4) * 8)
         elif self.addr is not None:
             addr = self.addr
         else:
