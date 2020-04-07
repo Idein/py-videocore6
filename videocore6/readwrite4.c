@@ -1,3 +1,11 @@
+
+#if defined(__arm__) && defined(__aarch64__)
+#error "__arm__ and __aarch64__ are both defined"
+#elif !defined(__arm__) && !defined(__aarch64__)
+#error "__arm__ and __aarch64__ are both not defined"
+#endif
+
+
 #include <stdint.h>
 
 

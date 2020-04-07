@@ -8,7 +8,7 @@ from videocore6 import __version__ as version
 
 ext_modules = []
 
-if platform.machine() == 'armv7l':
+if platform.machine() in ['armv7l', 'aarch64']:
     ext_modules.append(Extension('videocore6.readwrite4',
                                  sources = ['videocore6/readwrite4.c']))
 
