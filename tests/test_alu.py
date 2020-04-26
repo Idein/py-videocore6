@@ -37,10 +37,10 @@ ops = {
     'umin' : np.minimum,
     'umax' : np.maximum,
 
-    'shl' : lambda a,b: a << b,
-    'shr' : lambda a,b: a >> b,
-    'asr' : lambda a,b: a.astype('int32') >> b,
-    'ror' : np.vectorize(rotate_right),
+    'shl' : lambda a,b: a << (b % 32),
+    'shr' : lambda a,b: a >> (b % 32),
+    'asr' : lambda a,b: a.astype(np.int32) >> (b % 32),
+    'ror' : lambda a,b: np.vectorize(rotate_right)(a, b % 32),
 
     'band' : lambda a,b: a & b,
     'bor' : lambda a,b: a | b,
@@ -54,16 +54,16 @@ ops = {
     'fceil' : np.ceil,
     'fdx' : lambda x: (x[1::2] - x[0::2]).repeat(2),
     'fdy' : lambda x: (lambda a: (a[1::2] - a[0::2]).ravel())(x.reshape(-1,2).repeat(2,axis=0).reshape(-1,4)),
-    'ftoin': lambda x: x.round().astype('int32'),
-    'ftoiz': lambda x: np.trunc(x).astype('int32'),
-    'ftouz': lambda x: np.trunc(x).astype('uint32'),
+    'ftoin': lambda x: x.round().astype(np.int32),
+    'ftoiz': lambda x: np.float32(x).astype(np.int32),
+    'ftouz': np.vectorize(lambda x: np.float32(x).astype(np.uint32) if x > -1 else 0),
 
     'bnot' : lambda x: ~x,
     'neg' : lambda x: -x,
 
-    'itof' : lambda x: x.astype('float32'),
+    'itof' : lambda x: x.astype(np.float32),
     'clz' : np.vectorize(count_leading_zeros),
-    'utof' : lambda x: x.astype('float32'),
+    'utof' : lambda x: x.astype(np.float32),
 
     # pack/unpack flags
     'l' : lambda x: x[0::2],
@@ -134,8 +134,15 @@ def boilerplate_binary_ops(bin_ops, dst, src1, src2):
         Y = drv.alloc((len(cases), 16*4//np.dtype(dst_dtype).itemsize), dtype = dst_dtype)
         unif = drv.alloc(3, dtype = 'uint32')
 
-        X1[:] = np.random.randn(*X1.shape).astype(src1_dtype)
-        X2[:] = np.random.randn(*X2.shape).astype(src2_dtype)
+        if np.dtype(dst_dtype).name.startswith('float'):
+            X1[:] = np.random.uniform(-(2**7), 2**7, X1.shape).astype(src1_dtype)
+            X2[:] = np.random.uniform(-(2**7), 2**7, X2.shape).astype(src2_dtype)
+        elif np.dtype(dst_dtype).name.startswith('int'):
+            X1[:] = np.random.randint(-(2**31), 2**31, X1.shape, dtype=src1_dtype)
+            X2[:] = np.random.randint(-(2**31), 2**31, X2.shape, dtype=src2_dtype)
+        elif np.dtype(dst_dtype).name.startswith('uint'):
+            X1[:] = np.random.randint(0, 2**32, X1.shape, dtype=src1_dtype)
+            X2[:] = np.random.randint(0, 2**32, X2.shape, dtype=src2_dtype)
         Y[:] = 0.0
 
         unif[0] = X1.addresses()[0]
@@ -177,7 +184,7 @@ def test_binary_ops():
         )
 
     boilerplate_binary_ops(
-        ['add', 'sub', 'imin', 'imax'],
+        ['add', 'sub', 'imin', 'imax', 'asr'],
         ('int32', [None]), ('int32', [None]), ('int32', [None]),
     )
     boilerplate_binary_ops(
@@ -185,7 +192,7 @@ def test_binary_ops():
         ('uint32', [None]), ('uint32', [None]), ('uint32', [None]),
     )
     boilerplate_binary_ops(
-        ['shl', 'shr', 'asr', 'ror'],
+        ['shl', 'shr', 'ror'],
         ('uint32', [None]), ('uint32', [None]), ('uint32', [None]),
     )
     boilerplate_binary_ops(
@@ -242,7 +249,7 @@ def boilerplate_unary_ops(uni_ops, dst, src):
         Y = drv.alloc((len(cases), 16*4//np.dtype(dst_dtype).itemsize), dtype = dst_dtype)
         unif = drv.alloc(3, dtype = 'uint32')
 
-        X[:] = np.random.randn(*X.shape).astype(src_dtype)
+        X[:] = np.random.uniform(-(2**15), 2**15, X.shape).astype(src_dtype)
         Y[:] = 0.0
 
         unif[0] = X.addresses()[0]
