@@ -135,8 +135,8 @@ def boilerplate_binary_ops(bin_ops, dst, src1, src2):
         unif = drv.alloc(3, dtype = 'uint32')
 
         if np.dtype(dst_dtype).name.startswith('float'):
-            X1[:] = np.random.randn(*X1.shape).astype(src1_dtype)
-            X2[:] = np.random.randn(*X2.shape).astype(src2_dtype)
+            X1[:] = np.random.uniform(-(2**7), 2**7, X1.shape).astype(src1_dtype)
+            X2[:] = np.random.uniform(-(2**7), 2**7, X2.shape).astype(src2_dtype)
         elif np.dtype(dst_dtype).name.startswith('int'):
             X1[:] = np.random.randint(-(2**31), 2**31, X1.shape, dtype=src1_dtype)
             X2[:] = np.random.randint(-(2**31), 2**31, X2.shape, dtype=src2_dtype)
@@ -249,7 +249,7 @@ def boilerplate_unary_ops(uni_ops, dst, src):
         Y = drv.alloc((len(cases), 16*4//np.dtype(dst_dtype).itemsize), dtype = dst_dtype)
         unif = drv.alloc(3, dtype = 'uint32')
 
-        X[:] = np.random.randn(*X.shape).astype(src_dtype)
+        X[:] = np.random.uniform(-(2**15), 2**15, X.shape).astype(src_dtype)
         Y[:] = 0.0
 
         unif[0] = X.addresses()[0]
