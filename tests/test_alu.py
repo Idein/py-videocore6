@@ -37,10 +37,10 @@ ops = {
     'umin' : np.minimum,
     'umax' : np.maximum,
 
-    'shl' : lambda a,b: a << b,
-    'shr' : lambda a,b: a >> b,
-    'asr' : lambda a,b: a.astype('int32') >> b,
-    'ror' : np.vectorize(rotate_right),
+    'shl' : lambda a,b: a << (b % 32),
+    'shr' : lambda a,b: a >> (b % 32),
+    'asr' : lambda a,b: a.astype(np.int32) >> (b % 32),
+    'ror' : lambda a,b: np.vectorize(rotate_right)(a, b % 32),
 
     'band' : lambda a,b: a & b,
     'bor' : lambda a,b: a | b,
@@ -54,16 +54,16 @@ ops = {
     'fceil' : np.ceil,
     'fdx' : lambda x: (x[1::2] - x[0::2]).repeat(2),
     'fdy' : lambda x: (lambda a: (a[1::2] - a[0::2]).ravel())(x.reshape(-1,2).repeat(2,axis=0).reshape(-1,4)),
-    'ftoin': lambda x: x.round().astype('int32'),
-    'ftoiz': lambda x: np.trunc(x).astype('int32'),
-    'ftouz': lambda x: np.trunc(x).astype('uint32'),
+    'ftoin': lambda x: x.round().astype(np.int32),
+    'ftoiz': lambda x: np.float32(x).astype(np.int32),
+    'ftouz': np.vectorize(lambda x: np.float32(x).astype(np.uint32) if x > -1 else 0),
 
     'bnot' : lambda x: ~x,
     'neg' : lambda x: -x,
 
-    'itof' : lambda x: x.astype('float32'),
+    'itof' : lambda x: x.astype(np.float32),
     'clz' : np.vectorize(count_leading_zeros),
-    'utof' : lambda x: x.astype('float32'),
+    'utof' : lambda x: x.astype(np.float32),
 
     # pack/unpack flags
     'l' : lambda x: x[0::2],
@@ -177,7 +177,7 @@ def test_binary_ops():
         )
 
     boilerplate_binary_ops(
-        ['add', 'sub', 'imin', 'imax'],
+        ['add', 'sub', 'imin', 'imax', 'asr'],
         ('int32', [None]), ('int32', [None]), ('int32', [None]),
     )
     boilerplate_binary_ops(
@@ -185,7 +185,7 @@ def test_binary_ops():
         ('uint32', [None]), ('uint32', [None]), ('uint32', [None]),
     )
     boilerplate_binary_ops(
-        ['shl', 'shr', 'asr', 'ror'],
+        ['shl', 'shr', 'ror'],
         ('uint32', [None]), ('uint32', [None]), ('uint32', [None]),
     )
     boilerplate_binary_ops(
