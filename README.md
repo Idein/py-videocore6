@@ -1,83 +1,94 @@
 # py-videocore6
 
-Python library for GPGPU programming on Raspberry Pi 4.
+A Python library for GPGPU programming on Raspberry Pi 4, which realizes
+assembling and running QPU programs.
 
-The V3D DRM driver is based on
-[linux/drivers/gpu/drm/v3d](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/drivers/gpu/drm/v3d)
-and the assembler is based on
-[mesa/src/broadcom/qpu](https://gitlab.freedesktop.org/mesa/mesa/tree/master/src/broadcom/qpu).
-Especially, the disassembler in the Mesa repository is a great help in
-reverse-engineering the instruction set of VideoCore VI QPU.
-You can try it with
-[Terminus-IMRC/vc6qpudisas](https://github.com/Terminus-IMRC/vc6qpudisas).
-
-For Raspberry Pi 1/2/3, use
+For Raspberry Pi Zero/1/2/3, use
 [nineties/py-videocore](https://github.com/nineties/py-videocore) instead.
+
 
 ## About VideoCore VI QPU
 
-Raspberry Pi 4 has a GPU named VideoCore VI QPU in its SoC.
-Though the basic instruction set (add/mul ALU dual issue, three delay slots
-et al.) remains same as VideoCore IV QPU of Raspberry Pi 1/2/3,
-the usages of some units are dramatically changed.
-For instance, the TMU can now write to memory in addition to read.
-Consult the [tests](./tests) directory for more examples.
+Raspberry Pi 4 (BCM2711) has a GPU named VideoCore VI QPU in its SoC.
+The basic instruction set (add/mul ALU dual issue, three delay slots et al.)
+remains the same as VideoCore IV QPU of Raspberry Pi Zero/1/2/3, and some units
+now perform differently.
+For instance, the TMU can now write to memory in addition to read, and it seems
+that the VPM DMA is no longer available.
 
-Theoretical peak performances of QPUs are as follows.
-Note that the V3D DRM driver does not seem to support multi-sliced CSD job for
-now.
+Theoretical peak performance of QPUs are as follows.
 
 - VideoCore IV QPU @ 250MHz: 250 [MHz] x 3 [slice] x 4 [qpu/slice] x 4 [physical core/qpu] x 2 [op/cycle] = 24 [Gflop/s]
 - VideoCore IV QPU @ 300MHz: 300 [MHz] x 3 [slice] x 4 [qpu/slice] x 4 [physical core/qpu] x 2 [op/cycle] = 28.8 [Gflop/s]
 - VideoCore VI QPU @ 500MHz: 500 [MHz] x 2 [slice] x 4 [qpu/slice] x 4 [physical core/qpu] x 2 [op/cycle] = 32 [Gflop/s]
+
+
+## Requirements
+
+`py-videocore6` communicates with the V3D hardware through `/dev/dri/card0`,
+which is exposed by the DRM V3D driver.
+To access the device, you need to belong to `video` group or be `root` user.
+If you choose the former, run `sudo usermod --append --groups video $USER`
+(re-login to take effect).
+
 
 ## Installation
 
 You can install `py-videocore6` directly using `pip`:
 
 ```
-$ apt-get update
-$ apt-get install python3-pip
+$ sudo apt update
+$ sudo apt upgrade
+$ sudo apt install python3-pip python3-numpy
+$ pip3 install --user --upgrade pip setuptools wheel
 $ pip3 install --user git+https://github.com/Idein/py-videocore6.git
 ```
 
-## Testing
+If you are willing to run tests and examples, install `py-videocore6` after
+cloning it:
 
 ```
-$ pip3 install --user nose
+$ sudo apt update
+$ sudo apt upgrade
+$ sudo apt install python3-pip python3-numpy libatlas3-base
+$ python3 -m pip install --user --upgrade pip setuptools wheel
 $ git clone https://github.com/Idein/py-videocore6.git
 $ cd py-videocore6/
-$ nosetests -v -s
+$ python3 -m pip install --target sandbox/ --upgrade . nose
 ```
 
-To run all tests including the ones which require root privilege:
+
+## Running tests and examples
+
+In the `py-videocore6` directory cloned above:
 
 ```
-$ pip3 install --target dest . nose
-$ sudo PYTHONPATH=dest nosetests -v -s
+$ python3 setup.py build_ext --inplace
+$ PYTHONPATH=sandbox/ python3 -m nose -v -s
 ```
 
-## Running examples
-
-In the `py-videocore6` directory:
-
 ```
-$ PYTHONPATH=. python3 examples/sgemm.py
-==== sgemm example (123x567 times 567x512) ====
-numpy: 0.03433 sec, 2.086 Gflop/s
-QPU:   0.8327 sec, 0.08599 Gflop/s
+$ PYTHONPATH=sandbox/ python3 examples/sgemm.py
+==== sgemm example (1024x1024 times 1024x1024) ====
+numpy: 0.6986 sec, 3.078 Gflop/s
+QPU:   0.5546 sec, 3.878 Gflop/s
 Minimum absolute error: 0.0
-Maximum absolute error: 0.0
+Maximum absolute error: 0.0003814697265625
 Minimum relative error: 0.0
-Maximum relative error: 0.0
+Maximum relative error: 0.13375753164291382
 ```
 
-Note that the current implementation of sgemm is seriously naive, and therefore
-the performance is low at least for now.
-
 ```
-$ pip3 install --target dest .
-$ sudo PYTHONPATH=dest python3 examples/pctr_gpu_clock.py
+$ sudo PYTHONPATH=sandbox/ python3 examples/pctr_gpu_clock.py
 ==== QPU clock measurement with performance counters ====
-500.535482 MHz
+500.529835 MHz
 ```
+
+You may see lower performance without `force_turbo=1` in `/boot/config.txt`.
+
+
+## References
+
+- DRM V3D driver which controls QPU via hardware V3D registers: [linux/drivers/gpu/drm/v3d](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/drivers/gpu/drm/v3d)
+- Mesa library which partially includes the QPU instruction set: [mesa/src/broadcom/qpu](https://gitlab.freedesktop.org/mesa/mesa/tree/master/src/broadcom/qpu)
+- Mesa also includes QPU program disassembler, which can be tested with: [Terminus-IMRC/vc6qpudisas](https://github.com/Terminus-IMRC/vc6qpudisas)
