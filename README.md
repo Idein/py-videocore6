@@ -36,7 +36,7 @@ If you choose the former, run `sudo usermod --append --groups video $USER`
 
 You can install `py-videocore6` directly using `pip`:
 
-```
+```console
 $ sudo apt update
 $ sudo apt upgrade
 $ sudo apt install python3-pip python3-numpy
@@ -47,7 +47,7 @@ $ pip3 install --user git+https://github.com/Idein/py-videocore6.git
 If you are willing to run tests and examples, install `py-videocore6` after
 cloning it:
 
-```
+```console
 $ sudo apt update
 $ sudo apt upgrade
 $ sudo apt install python3-pip python3-numpy libatlas3-base
@@ -62,12 +62,12 @@ $ python3 -m pip install --target sandbox/ --upgrade . nose
 
 In the `py-videocore6` directory cloned above:
 
-```
+```console
 $ python3 setup.py build_ext --inplace
 $ PYTHONPATH=sandbox/ python3 -m nose -v -s
 ```
 
-```
+```console
 $ PYTHONPATH=sandbox/ python3 examples/sgemm.py
 ==== sgemm example (1024x1024 times 1024x1024) ====
 numpy: 0.6986 sec, 3.078 Gflop/s
@@ -78,7 +78,31 @@ Minimum relative error: 0.0
 Maximum relative error: 0.13375753164291382
 ```
 
+```console
+$ PYTHONPATH=sandbox/ python3 examples/summation.py
+==== summaton example (32.0 Mi elements) ====
+Preparing for buffers...
+Executing on QPU...
+0.01914575099999638 sec, 7010.314090057129 MB/s
 ```
+
+```console
+$ PYTHONPATH=sandbox/ python3 examples/memset.py
+==== memset example (64.0 MiB) ====
+Preparing for buffers...
+Executing on QPU...
+0.017949476000467257 sec, 3738.76451871091 MB/s
+```
+
+```console
+$ PYTHONPATH=sandbox/ python3 examples/scopy.py
+==== scopy example (16.0 Mi elements) ====
+Preparing for buffers...
+Executing on QPU...
+0.028124778999881528 sec, 2386.1116917677 MB/s
+```
+
+```console
 $ sudo PYTHONPATH=sandbox/ python3 examples/pctr_gpu_clock.py
 ==== QPU clock measurement with performance counters ====
 500.529835 MHz
