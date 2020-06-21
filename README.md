@@ -79,6 +79,30 @@ Maximum relative error: 0.13375753164291382
 ```
 
 ```console
+$ PYTHONPATH=sandbox/ python3 examples/summation.py
+==== summaton example (32.0 Mi elements) ====
+Preparing for buffers...
+Executing on QPU...
+0.01914575099999638 sec, 7010.314090057129 MB/s
+```
+
+```console
+$ PYTHONPATH=sandbox/ python3 examples/memset.py
+==== memset example (64.0 MiB) ====
+Preparing for buffers...
+Executing on QPU...
+0.017949476000467257 sec, 3738.76451871091 MB/s
+```
+
+```console
+$ PYTHONPATH=sandbox/ python3 examples/scopy.py
+==== scopy example (16.0 Mi elements) ====
+Preparing for buffers...
+Executing on QPU...
+0.028124778999881528 sec, 2386.1116917677 MB/s
+```
+
+```console
 $ sudo PYTHONPATH=sandbox/ python3 examples/pctr_gpu_clock.py
 ==== QPU clock measurement with performance counters ====
 500.529835 MHz
