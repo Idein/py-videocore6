@@ -198,6 +198,8 @@ class Driver(object):
     def program(self, prog, *args, **kwargs):
         if hasattr(prog, '__call__'):
             asm = assemble(prog, *args, **kwargs)
+        else:
+            asm = prog
 
         offset = self.code_pos
         code = Array(
