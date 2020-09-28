@@ -196,8 +196,8 @@ class Driver(object):
         self.dump_code(assemble(prog, *args, **kwargs), file=file)
 
     def program(self, prog, *args, **kwargs):
-
-        asm = assemble(prog, *args, **kwargs)
+        if hasattr(prog, '__call__'):
+            asm = assemble(prog, *args, **kwargs)
 
         offset = self.code_pos
         code = Array(
