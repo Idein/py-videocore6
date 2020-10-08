@@ -147,10 +147,13 @@ def qpu_rotate_alias(asm):
     nop() # required before rotate
 
     for i in range(-15, 16):
-        if i % 1 == 0:
-            rotate(r1, r0, i)       # add alias
-        else:
-            nop().rotate(r1, r0, i) # mul alias
+        rotate(r1, r0, i)       # add alias
+        mov(tmud, r1)
+        mov(tmua, rf1)
+        tmuwt().add(rf1, rf1, r3)
+
+    for i in range(-15, 16):
+        nop().rotate(r1, r0, i) # mul alias
         mov(tmud, r1)
         mov(tmua, rf1)
         tmuwt().add(rf1, rf1, r3)
@@ -158,10 +161,15 @@ def qpu_rotate_alias(asm):
     for i in range(-15, 16):
         mov(r5, i)
         nop() # require
-        if i % 1 == 0:
-            rotate(r1, r0, r5)       # add alias
-        else:
-            nop().rotate(r1, r0, r5) # mul alias
+        rotate(r1, r0, r5)       # add alias
+        mov(tmud, r1)
+        mov(tmua, rf1)
+        tmuwt().add(rf1, rf1, r3)
+
+    for i in range(-15, 16):
+        mov(r5, i)
+        nop() # require
+        nop().rotate(r1, r0, r5) # mul alias
         mov(tmud, r1)
         mov(tmua, rf1)
         tmuwt().add(rf1, rf1, r3)
@@ -181,7 +189,7 @@ def test_rotate_alias():
 
         code = drv.program(qpu_rotate_alias)
         X = drv.alloc((16, ), dtype = 'int32')
-        Y = drv.alloc((2, len(range(-15, 16)), 16), dtype = 'int32')
+        Y = drv.alloc((4, len(range(-15, 16)), 16), dtype = 'int32')
         unif = drv.alloc(3, dtype = 'uint32')
 
         X[:] = np.arange(16)
@@ -283,10 +291,13 @@ def qpu_quad_rotate_alias(asm):
     nop() # required before rotate
 
     for i in range(-15, 16):
-        if i % 1 == 0:
-            quad_rotate(r1, rf32, i)       # add alias
-        else:
-            nop().quad_rotate(r1, rf32, i) # mul alias
+        quad_rotate(r1, rf32, i)       # add alias
+        mov(tmud, r1)
+        mov(tmua, rf1)
+        tmuwt().add(rf1, rf1, r3)
+
+    for i in range(-15, 16):
+        nop().quad_rotate(r1, rf32, i) # mul alias
         mov(tmud, r1)
         mov(tmua, rf1)
         tmuwt().add(rf1, rf1, r3)
@@ -294,10 +305,15 @@ def qpu_quad_rotate_alias(asm):
     for i in range(-15, 16):
         mov(r5, i)
         nop() # require
-        if i % 1 == 0:
-            quad_rotate(r1, rf32, r5)       # add alias
-        else:
-            nop().quad_rotate(r1, rf32, r5) # mul alias
+        quad_rotate(r1, rf32, r5)       # add alias
+        mov(tmud, r1)
+        mov(tmua, rf1)
+        tmuwt().add(rf1, rf1, r3)
+
+    for i in range(-15, 16):
+        mov(r5, i)
+        nop() # require
+        nop().quad_rotate(r1, rf32, r5) # mul alias
         mov(tmud, r1)
         mov(tmua, rf1)
         tmuwt().add(rf1, rf1, r3)
@@ -317,7 +333,7 @@ def test_quad_rotate_alias():
 
         code = drv.program(qpu_quad_rotate_alias)
         X = drv.alloc((16, ), dtype = 'int32')
-        Y = drv.alloc((2, len(range(-15, 16)), 16), dtype = 'int32')
+        Y = drv.alloc((4, len(range(-15, 16)), 16), dtype = 'int32')
         unif = drv.alloc(3, dtype = 'uint32')
 
         X[:] = np.arange(16)
