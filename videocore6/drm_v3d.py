@@ -25,7 +25,7 @@ from ioctl_opt import IOW, IOWR
 
 class DRM_V3D(object):
 
-    def __init__(self, path='/dev/dri/by-path/platform-fec00000.v3d-card'):
+    def __init__(self, path='/dev/dri/card0'):
         self.fd = os.open(path, os.O_RDWR)
 
     def close(self):
