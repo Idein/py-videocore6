@@ -77,6 +77,49 @@ def qpu_unifa(asm):
     mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_inc)
     sub(r0, r0, 1, cond='pushz')
 
+    # Check if the two uniform streams proceed mutually-exclusively.
+    #
+    # Timeline:
+    #
+    #  time | unif     | unifa
+    # ------+----------+----------
+    #  T0   | set addr |
+    #  T1   | load     |
+    #  T2   |          | load
+    #  T3   |          | set addr
+    #  T4   |          | load
+    #  T5   | load     |
+    #  T0   | set addr |
+    #  T1   | load     |
+    #  T2   |          | load
+    #  T3   |          | set addr
+    #  T4   |          | load
+    #  T5   | load     |
+    #  ...  | ...      | ...
+
+    # Branch takes the second element as a new uniform address.
+    quad_rotate(reg_src1, reg_src1, 1)
+    shr(r0, reg_n, 1)
+    mov(unifa, reg_src0).add(reg_src0, reg_src0, 4)
+    L.l2
+    b(R.l3, cond='always').unif_addr(reg_src1)                      # T0
+    add(reg_src1, reg_src1, 8)
+    sub(r0, r0, 1, cond='pushz')
+    nop()
+    L.l3
+    nop(sig=ldunif)                                                 # T1
+    mov(tmud, r5)
+    mov(tmua, reg_dst, sig=ldunifa).mov(unifa, reg_src0)            # T2, T3
+    mov(tmud, r5)
+    add(reg_dst, reg_dst, reg_inc)
+    add(reg_src0, reg_src0, 8)
+    mov(tmua, reg_dst, sig=ldunifa).add(reg_dst, reg_dst, reg_inc)  # T4
+    mov(tmud, r5, sig=ldunif)                                       # T5
+    b(R.l2, cond='na0')
+    mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_inc)
+    mov(tmud, r5)
+    mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_inc)
+
     nop(sig=thrsw)
     nop(sig=thrsw)
     nop()
@@ -89,7 +132,9 @@ def qpu_unifa(asm):
 
 def test_unifa():
 
-    n = 521
+    n = 548
+
+    assert n >= 2 and n % 2 == 0
 
     with Driver() as drv:
 
@@ -97,7 +142,7 @@ def test_unifa():
         unif = drv.alloc(4, dtype='uint32')
         src0 = drv.alloc(n, dtype='uint32')
         src1 = drv.alloc(n, dtype='uint32')
-        dst = drv.alloc((n * 3, 16), dtype='uint32')
+        dst = drv.alloc((n * 5, 16), dtype='uint32')
 
         rng = np.random.default_rng()
         src0[:] = rng.integers(1, 2 ** 32 - 1, size=n)
@@ -115,3 +160,5 @@ def test_unifa():
             assert all(dst[i, :] == src0[i])
             assert all(dst[n + i * 2 + 0, :] == src0[i])
             assert all(dst[n + i * 2 + 1, :] == src1[i])
+            assert all(dst[n * 3 + i * 2 + (i % 2), :] == src1[i])
+            assert all(dst[n * 3 + i * 2 + (1 - i % 2), :] == src0[i])
