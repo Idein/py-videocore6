@@ -271,7 +271,7 @@ class Instruction(object):
             'null',
             'tlb',
             'tlbu',
-            'tmu',
+            'unifa',
             'tmul',
             'tmud',
             'tmua',
