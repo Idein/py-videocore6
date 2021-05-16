@@ -52,53 +52,41 @@ def qpu_memset(asm, *, num_qpus, unroll_shift, code_offset,
     else:
         raise Exception('num_qpus must be 1 or 8')
 
-    # addr += 4 * (thread_num + 16 * qpu_num)
+    # addr += 4 * 4 * (thread_num + 16 * qpu_num)
     shl(r0, reg_qpu_num, 4)
     eidx(r1)
     add(r0, r0, r1)
-    shl(r0, r0, 2)
+    shl(r0, r0, 4)
     add(reg_dst, reg_dst, r0)
 
-    # stride = 4 * 16 * num_qpus
-    # r0 = 1
+    # stride = 4 * 4 * 16 * num_qpus
     mov(r0, 1)
-    shl(reg_stride, r0, 6 + num_qpus_shift)
+    shl(reg_stride, r0, 8 + num_qpus_shift)
 
     # length /= 16 * num_qpus * unroll
     shr(reg_length, reg_length, 4 + num_qpus_shift + unroll_shift)
 
-    unroll = 1 << unroll_shift
+    while not align_cond(code_offset + len(asm)):
+        nop()
 
-    if unroll == 1:
+    with loop as l:
 
-        sub(reg_length, reg_length, r0, cond='pushz')
+        unroll = 1 << unroll_shift
 
-        while not align_cond(code_offset + len(asm)):
-            nop()
+        for i in range(unroll // 4 - 1):
+            mov(tmud, reg_fill)
+            mov(tmud, reg_fill)
+            mov(tmud, reg_fill)
+            mov(tmud, reg_fill)
+            mov(tmuau if i % 4 == 0 else tmua, reg_dst).add(reg_dst, reg_dst, reg_stride)
 
-        with loop as l:
+        mov(tmud, reg_fill).mov(r0, 1)
+        mov(tmud, reg_fill).sub(reg_length, reg_length, r0, cond='pushz')
 
-            l.b(cond='na0')
-            mov(tmud, reg_fill)                                   # delay slot
-            mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_stride)  # delay slot
-            sub(reg_length, reg_length, r0, cond='pushz')         # delay slot
-
-    else:
-
-        while not align_cond(code_offset + len(asm)):
-            nop()
-
-        with loop as l:
-
-            for i in range(unroll - 2):
-                mov(tmud, reg_fill)
-                mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_stride)
-
-            mov(tmud, reg_fill).sub(reg_length, reg_length, r0, cond='pushz')
-            l.b(cond='na0')
-            mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_stride)  # delay slot
-            mov(tmud, reg_fill)                                   # delay slot
-            mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_stride)  # delay slot
+        l.b(cond='na0').unif_addr(absolute=False)
+        mov(tmud, reg_fill)
+        mov(tmud, reg_fill)
+        mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_stride)
 
     nop(sig=thrsw)
     nop(sig=thrsw)
@@ -110,10 +98,11 @@ def qpu_memset(asm, *, num_qpus, unroll_shift, code_offset,
     nop()
 
 
-def memset(*, fill, length, num_qpus=8, unroll_shift=1):
+def memset(*, fill, length, num_qpus=8, unroll_shift=5):
 
     assert length > 0
     assert length % (16 * num_qpus * (1 << unroll_shift)) == 0
+    assert unroll_shift >= 4
 
     print(f'==== memset example ({length * 4 / 1024 / 1024} MiB) ====')
 
@@ -131,10 +120,12 @@ def memset(*, fill, length, num_qpus=8, unroll_shift=1):
 
         assert not np.array_equiv(X, fill)
 
-        unif = drv.alloc(3, dtype='uint32')
+        unif = drv.alloc(3 + (1 << (unroll_shift - 4)) + 1, dtype='uint32')
         unif[0] = X.addresses()[0]
         unif[1] = fill
         unif[2] = length
+        unif[3: -1] = 0xfcfcfcfc
+        unif[-1] = 4 * (-len(unif) + 3)
 
         print('Executing on QPU...')
 
