@@ -52,19 +52,21 @@ def qpu_scopy(asm, *, num_qpus, unroll_shift, code_offset,
     else:
         raise Exception('num_qpus must be 1 or 8')
 
-    # addr += 4 * (thread_num + 16 * qpu_num)
+    # addr += 4 * 4 * (thread_num + 16 * qpu_num)
     shl(r0, reg_qpu_num, 4)
     eidx(r1)
     add(r0, r0, r1)
-    shl(r0, r0, 2)
+    shl(r0, r0, 4)
     add(reg_src, reg_src, r0).add(reg_dst, reg_dst, r0)
 
-    # stride = 4 * 16 * num_qpus
+    # stride = 4 * 4 * 16 * num_qpus
     mov(reg_stride, 1)
-    shl(reg_stride, reg_stride, 6 + num_qpus_shift)
+    shl(reg_stride, reg_stride, 8 + num_qpus_shift)
+
+    num_shifts = [*range(16), *range(-16, 0)]
 
     # length /= 16 * 8 * num_qpus * unroll
-    shr(reg_length, reg_length, 7 + num_qpus_shift + unroll_shift)
+    shr(reg_length, reg_length, num_shifts[7 + num_qpus_shift + unroll_shift])
 
     # This single thread switch and two nops just before the loop are really
     # important for TMU read to achieve a better performance.
@@ -81,29 +83,53 @@ def qpu_scopy(asm, *, num_qpus, unroll_shift, code_offset,
 
         unroll = 1 << unroll_shift
 
-        for i in range(8):
-            mov(tmua, reg_src).add(reg_src, reg_src, reg_stride)
+        # A smaller number of instructions does not necessarily mean a faster
+        # operation.  Rather, complicated TMU manipulations may perform worse
+        # and even cause a hardware bug.
 
-        for j in range(unroll - 1):
-            for i in range(8):
-                nop(sig=ldtmu(r0))
-                mov(tmua, reg_src).add(reg_src, reg_src, reg_stride)
-                mov(tmud, r0)
-                mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_stride)
+        mov(tmuau, reg_src).add(reg_src, reg_src, reg_stride)
+        mov(tmua, reg_src).add(reg_src, reg_src, reg_stride)
 
-        for i in range(6):
+        for i in range(unroll - 1):
+            nop(sig=ldtmu(r0))
+            mov(tmud, r0, sig=ldtmu(r0))
+            mov(tmud, r0, sig=ldtmu(r0))
+            mov(tmud, r0)
             nop(sig=ldtmu(r0))
             mov(tmud, r0)
             mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_stride)
+            mov(tmua, reg_src).add(reg_src, reg_src, reg_stride)
+            nop(sig=ldtmu(r0))
+            mov(tmud, r0, sig=ldtmu(r0))
+            mov(tmud, r0, sig=ldtmu(r0))
+            mov(tmud, r0)
+            nop(sig=ldtmu(r0))
+            mov(tmud, r0)
+            mov(tmuau, reg_dst).add(reg_dst, reg_dst, reg_stride)
+            mov(tmua, reg_src).add(reg_src, reg_src, reg_stride)
+
+        if unroll == 1:
+            # Prefetch the next source.
+            mov(tmua, reg_src)
 
         nop(sig=ldtmu(r0))
-        mov(tmud, r0).sub(reg_length, reg_length, 1, cond='pushz')
+        mov(tmud, r0, sig=ldtmu(r0))
+        mov(tmud, r0, sig=ldtmu(r0))
+        mov(tmud, r0)
+        nop(sig=ldtmu(r0))
+        sub(reg_length, reg_length, 1, cond='pushz').mov(tmud, r0)
         mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_stride)
 
-        l.b(cond='na0')
-        nop(sig=ldtmu(r0))                                    # delay slot
-        mov(tmud, r0)                                         # delay slot
-        mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_stride)  # delay slot
+        if unroll == 1:
+            mov(tmuc, 0xfffffffc)
+        nop(sig=ldtmu(r0))
+        mov(tmud, r0, sig=ldtmu(r0))
+        mov(tmud, r0, sig=ldtmu(r0))
+
+        l.b(cond='na0').unif_addr(absolute=False)
+        mov(tmud, r0, sig=ldtmu(r0))
+        mov(tmud, r0)
+        mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_stride)
 
     # This synchronization is needed between the last TMU operation and the
     # program end with the thread switch just before the loop above.
@@ -136,18 +162,23 @@ def scopy(*, length, num_qpus=8, unroll_shift=0):
 
         print('Preparing for buffers...')
 
-        X = drv.alloc(length, dtype='float32')
-        Y = drv.alloc(length, dtype='float32')
+        X = drv.alloc(length, dtype='uint32')
+        Y = drv.alloc(length, dtype='uint32')
 
         X[:] = np.arange(*X.shape, dtype=X.dtype)
         Y[:] = -X
 
         assert not np.array_equal(X, Y)
 
-        unif = drv.alloc(3, dtype='uint32')
+        unif = drv.alloc(3 + (1 << unroll_shift) + 1, dtype='uint32')
         unif[0] = length
         unif[1] = X.addresses()[0]
         unif[2] = Y.addresses()[0]
+        if unroll_shift == 0:
+            unif[3] = 0xfc80fcfc
+        else:
+            unif[3: -1] = 0xfcfcfcfc
+        unif[-1] = 4 * (-len(unif) + 3)
 
         print('Executing on QPU...')
 
