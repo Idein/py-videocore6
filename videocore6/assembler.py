@@ -1127,7 +1127,7 @@ class Loop(object):
         self.name = name
 
     def b(self, *args, **kwargs):
-        Branch(self.asm, 'b', Reference(self.asm, self.name), *args, **kwargs)
+        return Branch(self.asm, 'b', Reference(self.asm, self.name), *args, **kwargs)
 
 
 class LoopHelper(object):

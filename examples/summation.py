@@ -52,16 +52,18 @@ def qpu_summation(asm, *, num_qpus, unroll_shift, code_offset,
     else:
         raise Exception('num_qpus must be 1 or 8')
 
-    # addr += 4 * (thread_num + 16 * qpu_num)
+    # src += 4 * 4 * (thread_num + 16 * qpu_num)
+    # dst += 4 * (thread_num + 16 * qpu_num)
     shl(r0, reg_qpu_num, 4)
     eidx(r1)
     add(r0, r0, r1)
     shl(r0, r0, 2)
-    add(reg_src, reg_src, r0).add(reg_dst, reg_dst, r0)
+    shl(r0, r0, 2).add(reg_dst, reg_dst, r0)
+    add(reg_src, reg_src, r0)
 
-    # stride = 4 * 16 * num_qpus
+    # stride = 4 * 4 * 16 * num_qpus
     mov(reg_stride, 1)
-    shl(reg_stride, reg_stride, 6 + num_qpus_shift)
+    shl(reg_stride, reg_stride, 8 + num_qpus_shift)
 
     # The QPU performs shifts and rotates modulo 32, so it actually supports
     # shift amounts [0, 31] only with small immediates.
@@ -70,13 +72,17 @@ def qpu_summation(asm, *, num_qpus, unroll_shift, code_offset,
     # length /= 16 * 8 * num_qpus * unroll
     shr(reg_length, reg_length, num_shifts[7 + num_qpus_shift + unroll_shift])
 
+    # sum = 0
+    # length -= 1
+    # r2 = stride
+
     # This single thread switch and two instructions just before the loop are
     # really important for TMU read to achieve a better performance.
     # This also enables TMU read requests without the thread switch signal, and
     # the eight-depth TMU read request queue.
     nop(sig=thrsw)
-    nop()
     bxor(reg_sum, 1, 1).mov(r1, 1)
+    sub(reg_length, reg_length, r1, cond='pushz').mov(r2, reg_stride)
 
     while not align_cond(code_offset + len(asm)):
         nop()
@@ -85,23 +91,29 @@ def qpu_summation(asm, *, num_qpus, unroll_shift, code_offset,
 
         unroll = 1 << unroll_shift
 
-        for i in range(7):
-            mov(tmua, reg_src).add(reg_src, reg_src, reg_stride)
-        mov(tmua, reg_src).sub(reg_length, reg_length, r1, cond='pushz')
-        add(reg_src, reg_src, reg_stride, sig=ldtmu(r0))
+        mov(tmuau, reg_src).add(reg_src, reg_src, reg_stride)
+        mov(tmua, reg_src, sig=ldtmu(r0))
 
-        for j in range(unroll - 1):
-            for i in range(8):
-                mov(tmua, reg_src).add(reg_src, reg_src, reg_stride)
-                add(reg_sum, reg_sum, r0, sig=ldtmu(r0))
-
-        for i in range(5):
+        for i in range(unroll - 1):
+            add(reg_sum, reg_sum, r0, sig=ldtmu(r0)).add(reg_src, reg_src, r2)
             add(reg_sum, reg_sum, r0, sig=ldtmu(r0))
+            add(reg_sum, reg_sum, r0, sig=ldtmu(r0))
+            add(reg_sum, reg_sum, r0, sig=ldtmu(r0)).mov(tmuau if i % 2 == 1 else tmua, reg_src)
+            add(reg_sum, reg_sum, r0, sig=ldtmu(r0)).add(reg_src, reg_src, r2)
+            add(reg_sum, reg_sum, r0, sig=ldtmu(r0))
+            add(reg_sum, reg_sum, r0, sig=ldtmu(r0))
+            add(reg_sum, reg_sum, r0, sig=ldtmu(r0)).mov(tmua, reg_src)
 
-        l.b(cond='na0')
-        add(reg_sum, reg_sum, r0, sig=ldtmu(r0))  # delay slot
-        add(reg_sum, reg_sum, r0, sig=ldtmu(r0))  # delay slot
-        add(reg_sum, reg_sum, r0)                 # delay slot
+        add(reg_sum, reg_sum, r0, sig=ldtmu(r0)).add(reg_src, reg_src, r2)
+        add(reg_sum, reg_sum, r0, sig=ldtmu(r0))
+        add(reg_sum, reg_sum, r0, sig=ldtmu(r0))
+        add(reg_sum, reg_sum, r0, sig=ldtmu(r0))
+        add(reg_sum, reg_sum, r0, sig=ldtmu(r0))
+
+        l.b(cond='na0').unif_addr(absolute=False)
+        add(reg_sum, reg_sum, r0, sig=ldtmu(r0))
+        add(reg_sum, reg_sum, r0, sig=ldtmu(r0))
+        add(reg_sum, reg_sum, r0).sub(reg_length, reg_length, r1, cond='pushz')
 
     mov(tmud, reg_sum)
     mov(tmua, reg_dst)
@@ -122,7 +134,7 @@ def qpu_summation(asm, *, num_qpus, unroll_shift, code_offset,
     nop()
 
 
-def summation(*, length, num_qpus=8, unroll_shift=5):
+def summation(*, length, num_qpus=8, unroll_shift=2):
 
     assert length > 0
     assert length % (16 * 8 * num_qpus * (1 << unroll_shift)) == 0
@@ -145,10 +157,16 @@ def summation(*, length, num_qpus=8, unroll_shift=5):
 
         assert sum(Y) == 0
 
-        unif = drv.alloc(3, dtype='uint32')
+        if unroll_shift == 0:
+            unif = drv.alloc(3 + 1 + 1, dtype='uint32')
+            unif[3] = 0xfffffcfc
+        else:
+            unif = drv.alloc(3 + (1 << (unroll_shift - 1)) + 1, dtype='uint32')
+            unif[3: -1] = 0xfcfcfcfc
         unif[0] = length
         unif[1] = X.addresses()[0]
         unif[2] = Y.addresses()[0]
+        unif[-1] = 4 * (-len(unif) + 3)
 
         print('Executing on QPU...')
 

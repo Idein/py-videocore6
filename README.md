@@ -83,7 +83,7 @@ $ PYTHONPATH=sandbox/ python3 examples/summation.py
 ==== summaton example (32.0 Mi elements) ====
 Preparing for buffers...
 Executing on QPU...
-0.01914575099999638 sec, 7010.314090057129 MB/s
+0.01853448400004254 sec, 7241.514141947083 MB/s
 ```
 
 ```console
@@ -91,7 +91,7 @@ $ PYTHONPATH=sandbox/ python3 examples/memset.py
 ==== memset example (64.0 MiB) ====
 Preparing for buffers...
 Executing on QPU...
-0.017949476000467257 sec, 3738.76451871091 MB/s
+0.01788834699993913 sec, 3751.5408215319367 MB/s
 ```
 
 ```console
@@ -99,7 +99,7 @@ $ PYTHONPATH=sandbox/ python3 examples/scopy.py
 ==== scopy example (16.0 Mi elements) ====
 Preparing for buffers...
 Executing on QPU...
-0.028124778999881528 sec, 2386.1116917677 MB/s
+0.02768789600000332 sec, 2423.761776625857 MB/s
 ```
 
 ```console

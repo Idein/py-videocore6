@@ -85,6 +85,110 @@ def test_tmu_write():
 
 
 @qpu
+def qpu_tmu_vec_write(asm, configs, vec_offset):
+
+    reg_addr = rf0
+    reg_n = rf1
+
+    nop(sig=ldunifrf(reg_addr))
+    nop(sig=ldunifrf(reg_n))
+
+    with loop as l:
+
+        assert 1 <= len(configs) <= 4
+        for i, config in enumerate(configs):
+
+            eidx(r0)
+            shl(r0, r0, 0xfffffff0)  # 0xfffffff0 % 32 = 16
+            assert 1 <= config <= 4
+            for j in range(config):
+                mov(tmud, r0).add(r0, r0, 1)
+
+            assert 0 <= vec_offset <= 3
+            # addr + 4 * 4 * eidx + 4 * vec_offset
+            eidx(r0)
+            shl(r0, r0, 4)
+            sub(r0, r0, -4 * vec_offset)
+            add(tmuau if i == 0 else tmua, reg_addr, r0)
+
+            # addr += 4 * len(configs) * 16
+            shl(r0, 4, 4)
+            umul24(r0, r0, len(configs))
+            add(reg_addr, reg_addr, r0)
+
+        sub(reg_n, reg_n, 1, cond='pushz')
+        l.b(cond='na0')
+        nop()
+        nop()
+        nop()
+
+    nop(sig = thrsw)
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop()
+
+
+def test_tmu_vec_write():
+
+    n = 123
+
+    # The number of 32-bit values in a vector element per pixel is 1, 2, 3, or 4.
+    # For example, with four 32-bit config:
+    #     tmud <- r0
+    #     tmud <- r1
+    #     tmud <- r2
+    #     tmud <- r3
+    #     tmuau <- addr + 4 * 4 * eidx
+    # results in:
+    #     addr + 0x00: r0[ 0], r1[ 0], r2[ 0], r3[ 0], r0[ 1], r1[ 1], ..., r3[ 3]
+    #     addr + 0x40: r0[ 4], r1[ 4], r2[ 4], r3[ 4], r0[ 5], r1[ 5], ..., r3[ 7]
+    #     addr + 0x80: ...
+    #     addr + 0xc0: r0[12], r1[12], r2[12], r3[12], r0[13], r1[13], ..., r3[15]
+    # where rn[i] (0 <= i < 16) is the value in register rn of pixel (eidx) i.
+    configs = [4, 3, 2, 1]
+
+    # The element per pixel is wrapped modulo 16 bytes.
+    # For example, if the above address setting is addr + 4 * 4 * eidx + 4, then
+    #     addr + 0x00: r3[ 0], r0[ 0], r1[ 0], r2[ 0], r3[ 1], r0[ 1], ..., r2[ 3]
+    #     addr + 0x40: r3[ 4], r0[ 4], r1[ 4], r2[ 4], r3[ 5], r0[ 5], ..., r2[ 7]
+    #     addr + 0x80: ...
+    #     addr + 0xc0: r3[12], r0[12], r1[12], r2[12], r3[13], r0[13], ..., r2[15]
+    vec_offset = 3
+
+    data_default = 0xdeadbeef
+
+    with Driver() as drv:
+
+        code = drv.program(qpu_tmu_vec_write, configs, vec_offset)
+        data = drv.alloc(16 * 4 * len(configs) * n, dtype='uint32')
+        unif = drv.alloc(2 + n, dtype='uint32')
+
+        data[:] = data_default
+
+        unif[0] = data.addresses()[0]
+        unif[1] = n
+
+        conf = 0xffffffff
+        for config in reversed(configs):
+            conf <<= 8
+            conf |= {1: 0xff, 2: 0xfa, 3: 0xfb, 4: 0xfc}[config]
+        conf &= 0xffffffff
+        unif[2:] = conf
+
+        drv.execute(code, unif.addresses()[0])
+
+        for i, row in enumerate(data.reshape(-1, 4 * 16)):
+            config = configs[i % len(configs)]
+            for j, vec in enumerate(row.reshape(-1, 4)):
+                ref = list(range(j << 16, (j << 16) + config)) + [data_default] * (4 - config)
+                assert all(np.roll(vec, -vec_offset) == ref)
+
+
+@qpu
 def qpu_tmu_read(asm):
 
     # r0: Number of vectors to read.
@@ -139,6 +243,119 @@ def test_tmu_read():
         drv.execute(code, unif.addresses()[0])
 
         assert all(data == range(1, n * 16 + 1))
+
+
+@qpu
+def qpu_tmu_vec_read(asm, configs, vec_offset):
+
+    reg_src = rf0
+    reg_dst = rf1
+    reg_n = rf2
+
+    nop(sig=ldunifrf(reg_src))
+    nop(sig=ldunifrf(reg_dst))
+    nop(sig=ldunifrf(reg_n))
+
+    # dst += 4 * eidx
+    eidx(r0)
+    shl(r0, r0, 2)
+    add(reg_dst, reg_dst, r0)
+
+    with loop as l:
+
+        mov(r4, 0)
+
+        assert 1 <= len(configs) <= 4
+        for i, config in enumerate(configs):
+
+            assert 1 <= config <= 4
+            assert 0 <= vec_offset <= 3
+            # addr + 4 * 4 * eidx + 4 * vec_offset
+            eidx(r0)
+            shl(r0, r0, 4)
+            sub(r0, r0, -4 * vec_offset)
+            add(tmuau if i == 0 else tmua, reg_src, r0, sig=thrsw)
+            nop()
+            nop()
+            nop(sig=ldtmu(r0))
+            nop(sig=ldtmu(r1)) if config >= 2 else eidx(r1)
+            nop(sig=ldtmu(r2)) if config >= 3 else eidx(r2)
+            nop(sig=ldtmu(r3)) if config >= 4 else eidx(r3)
+
+            add(r0, r0, r1).add(r2, r2, r3)
+            add(r0, r0, r2)
+            add(r4, r4, r0)
+            # src += 4 * 4 * 16
+            shl(r0, 4, 4)
+            umul24(r0, r0, 4)
+            add(reg_src, reg_src, r0)
+
+        mov(tmud, r4)
+        # If the configs are shited out, then 0xff (per-pixel regular 32-bit
+        # write) is filled in.
+        mov(tmua, reg_dst)
+
+        # dst += 4 * 16
+        shl(r0, 4, 4)
+        add(reg_dst, reg_dst, r0)
+
+        sub(reg_n, reg_n, 1, cond='pushz')
+        l.b(cond='na0')
+        nop()
+        nop()
+        nop()
+
+    nop(sig = thrsw)
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop(sig = thrsw)
+    nop()
+    nop()
+    nop()
+
+
+def test_tmu_vec_read():
+
+    # The settings, the number of elements in a vector, and 16-byte wrapping are
+    # the same as the vector writes.
+
+    n = 123
+    configs = [4, 3, 2, 1]
+    vec_offset = 1
+
+    with Driver() as drv:
+
+        code = drv.program(qpu_tmu_vec_read, configs, vec_offset)
+        src = drv.alloc((n, 16 * 4 * len(configs)), dtype='uint32')
+        dst = drv.alloc((n, 16), dtype='uint32')
+        unif = drv.alloc(3 + n, dtype='uint32')
+
+        src[:, :] = np.arange(src.size, dtype=src.dtype).reshape(src.shape)
+        dst[:, :] = 0
+
+        unif[0] = src.addresses()[0, 0]
+        unif[1] = dst.addresses()[0, 0]
+        unif[2] = n
+
+        conf = 0xffffffff
+        for config in reversed(configs):
+            conf <<= 8
+            conf |= {1: 0xff, 2: 0xfa, 3: 0xfb, 4: 0xfc}[config]
+        conf &= 0xffffffff
+        unif[3:] = conf
+
+        drv.execute(code, unif.addresses()[0])
+
+        for i, vec in enumerate(dst):
+            data = src.shape[1] * i + np.arange(src.shape[1], dtype='uint32').reshape(len(configs), 16, 4)
+            s = [0] * 16
+            for j, config in enumerate(configs):
+                for eidx in range(16):
+                    for k in range(config):
+                        s[eidx] += data[j, eidx, (k + vec_offset) % 4]
+                    s[eidx] += eidx * (4 - config)
+            assert all(vec == s)
 
 
 # VC4 TMU cache & DMA break memory consistency.
