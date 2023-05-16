@@ -114,5 +114,5 @@ You may see lower performance without `force_turbo=1` in `/boot/config.txt`.
 ## References
 
 - DRM V3D driver which controls QPU via hardware V3D registers: [linux/drivers/gpu/drm/v3d](https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/drivers/gpu/drm/v3d)
-- Mesa library which partially includes the QPU instruction set: [mesa/src/broadcom/qpu](https://gitlab.freedesktop.org/mesa/mesa/tree/master/src/broadcom/qpu)
+- Mesa library which partially includes the QPU instruction set: [mesa/src/broadcom/qpu](https://gitlab.freedesktop.org/mesa/mesa/-/tree/main/src/broadcom/qpu)
 - Mesa also includes QPU program disassembler, which can be tested with: [Terminus-IMRC/vc6qpudisas](https://github.com/Terminus-IMRC/vc6qpudisas)
