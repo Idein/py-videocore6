@@ -178,7 +178,7 @@ def scopy(*, length, num_qpus=8, unroll_shift=0):
             unif[3] = 0xfc80fcfc
         else:
             unif[3: -1] = 0xfcfcfcfc
-        unif[-1] = 4 * (-len(unif) + 3)
+        unif[-1] = 4 * (-len(unif) + 3) & 0xFFFFFFFF
 
         print('Executing on QPU...')
 

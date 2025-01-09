@@ -116,7 +116,7 @@ def memset(*, fill, length, num_qpus=8, unroll_shift=5):
 
         X = drv.alloc(length, dtype='uint32')
 
-        X.fill(~fill)
+        X.fill(~fill & 0xFFFFFFFF)
 
         assert not np.array_equiv(X, fill)
 
@@ -125,7 +125,7 @@ def memset(*, fill, length, num_qpus=8, unroll_shift=5):
         unif[1] = fill
         unif[2] = length
         unif[3: -1] = 0xfcfcfcfc
-        unif[-1] = 4 * (-len(unif) + 3)
+        unif[-1] = 4 * (-len(unif) + 3) & 0xFFFFFFFF
 
         print('Executing on QPU...')
 
