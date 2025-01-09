@@ -174,7 +174,7 @@ def summation(*, length, num_qpus=8, unroll_shift=2):
         drv.execute(code, unif.addresses()[0], thread=num_qpus)
         end = monotonic()
 
-        assert sum(Y.astype(int)) % 2**32 == (length - 1) * length // 2 % 2**32
+        assert int(sum(Y.astype(int))) % 2**32 == (length - 1) * length // 2 % 2**32
 
         print(f'{end - start} sec, {length * 4 / (end - start) * 1e-6} MB/s')
 
