@@ -166,7 +166,7 @@ def summation(*, length, num_qpus=8, unroll_shift=2):
         unif[0] = length
         unif[1] = X.addresses()[0]
         unif[2] = Y.addresses()[0]
-        unif[-1] = 4 * (-len(unif) + 3)
+        unif[-1] = 4 * (-len(unif) + 3) & 0xFFFFFFFF
 
         print('Executing on QPU...')
 
@@ -174,7 +174,7 @@ def summation(*, length, num_qpus=8, unroll_shift=2):
         drv.execute(code, unif.addresses()[0], thread=num_qpus)
         end = monotonic()
 
-        assert sum(Y) % 2**32 == (length - 1) * length // 2 % 2**32
+        assert int(sum(Y.astype(int))) % 2**32 == (length - 1) * length // 2 % 2**32
 
         print(f'{end - start} sec, {length * 4 / (end - start) * 1e-6} MB/s')
 
