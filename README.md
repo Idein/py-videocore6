@@ -34,41 +34,29 @@ If you choose the former, run `sudo usermod --append --groups video $USER`
 
 ## Installation
 
-You can install `py-videocore6` directly using `pip`:
+[Install `uv`](https://docs.astral.sh/uv/getting-started/installation/) and
+clone `py-videocore6` and run with `uv`:
 
 ```console
 $ sudo apt update
 $ sudo apt upgrade
-$ sudo apt install python3-pip python3-numpy
-$ pip3 install --user --upgrade pip setuptools wheel
-$ pip3 install --user git+https://github.com/Idein/py-videocore6.git
-```
-
-If you are willing to run tests and examples, install `py-videocore6` after
-cloning it:
-
-```console
-$ sudo apt update
-$ sudo apt upgrade
-$ sudo apt install python3-pip python3-numpy libatlas3-base
-$ python3 -m pip install --user --upgrade pip setuptools wheel
+$ sudo apt install git
 $ git clone https://github.com/Idein/py-videocore6.git
 $ cd py-videocore6/
-$ python3 -m pip install --target sandbox/ --upgrade . nose
+$ uv sync
+$ uv run example/sgemm.py
 ```
-
 
 ## Running tests and examples
 
 In the `py-videocore6` directory cloned above:
 
 ```console
-$ python3 setup.py build_ext --inplace
-$ PYTHONPATH=sandbox/ python3 -m nose -v -s
+$ uv run pytest -s test
 ```
 
 ```console
-$ PYTHONPATH=sandbox/ python3 examples/sgemm.py
+$ uv run examples/sgemm.py
 ==== sgemm example (1024x1024 times 1024x1024) ====
 numpy: 0.6986 sec, 3.078 Gflop/s
 QPU:   0.5546 sec, 3.878 Gflop/s
@@ -79,7 +67,7 @@ Maximum relative error: 0.13375753164291382
 ```
 
 ```console
-$ PYTHONPATH=sandbox/ python3 examples/summation.py
+$ uv run examples/summation.py
 ==== summaton example (32.0 Mi elements) ====
 Preparing for buffers...
 Executing on QPU...
@@ -87,7 +75,7 @@ Executing on QPU...
 ```
 
 ```console
-$ PYTHONPATH=sandbox/ python3 examples/memset.py
+$ uv run examples/memset.py
 ==== memset example (64.0 MiB) ====
 Preparing for buffers...
 Executing on QPU...
@@ -95,7 +83,7 @@ Executing on QPU...
 ```
 
 ```console
-$ PYTHONPATH=sandbox/ python3 examples/scopy.py
+$ uv run examples/scopy.py
 ==== scopy example (16.0 Mi elements) ====
 Preparing for buffers...
 Executing on QPU...
@@ -103,7 +91,7 @@ Executing on QPU...
 ```
 
 ```console
-$ sudo PYTHONPATH=sandbox/ python3 examples/pctr_gpu_clock.py
+$ sudo $(which uv) run examples/pctr_gpu_clock.py
 ==== QPU clock measurement with performance counters ====
 500.529835 MHz
 ```
