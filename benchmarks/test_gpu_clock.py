@@ -1,4 +1,3 @@
-
 # Copyright (c) 2019-2020 Idein Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,21 +18,23 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
 import time
-from videocore6.driver import Driver
-from videocore6.assembler import qpu
+
+import numpy as np
 from bench_helper import BenchHelper
 
+from videocore6.assembler import *
+from videocore6.driver import Array, Driver
+
+
 @qpu
-def qpu_clock(asm):
+def qpu_clock(asm: Assembly) -> None:
+    nop(sig=ldunif)
+    nop(sig=ldunifrf(rf0))
 
-    nop(sig = ldunif)
-    nop(sig = ldunifrf(rf0))
-
-    with loop as l:
-        sub(r5, r5, 1, cond = 'pushn')
-        l.b(cond = 'anyna')
+    with loop as l:  # noqa: E741
+        sub(r5, r5, 1, cond="pushn")
+        l.b(cond="anyna")
         nop()
         nop()
         nop()
@@ -42,28 +43,27 @@ def qpu_clock(asm):
     mov(tmua, rf0)
     tmuwt()
 
-    nop(sig = thrsw)
-    nop(sig = thrsw)
+    nop(sig=thrsw)
+    nop(sig=thrsw)
     nop()
     nop()
-    nop(sig = thrsw)
+    nop(sig=thrsw)
     nop()
     nop()
     nop()
 
 
-def test_clock():
+def test_clock() -> None:
     print()
 
-    bench = BenchHelper('benchmarks/libbench_helper.so')
+    bench = BenchHelper("benchmarks/libbench_helper.so")
 
     with Driver() as drv:
-
         f = pow(2, 25)
 
         code = drv.program(qpu_clock)
-        unif = drv.alloc(2, dtype = 'uint32')
-        done = drv.alloc(1, dtype = 'uint32')
+        unif: Array[np.uint32] = drv.alloc(2, dtype=np.uint32)
+        done: Array[np.uint32] = drv.alloc(1, dtype=np.uint32)
 
         done[:] = 0
 
@@ -76,5 +76,5 @@ def test_clock():
             bench.wait_address(done)
             end = time.time()
 
-        print(f'{end - start:.6f} sec')
-        print(f'{f * 5 / (end - start) / 1000 / 1000 * 4:.6f} MHz')
+        print(f"{end - start:.6f} sec")
+        print(f"{f * 5 / (end - start) / 1000 / 1000 * 4:.6f} MHz")

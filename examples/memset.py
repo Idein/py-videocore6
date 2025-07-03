@@ -1,4 +1,3 @@
-
 # Copyright (c) 2019-2020 Idein Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,23 +18,29 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
-
+from collections.abc import Callable
 from time import monotonic
 
 import numpy as np
 
-from videocore6.assembler import qpu
-from videocore6.driver import Driver
+from videocore6.assembler import *
+from videocore6.driver import Array, Driver
 
 
 @qpu
-def qpu_memset(asm, *, num_qpus, unroll_shift, code_offset,
-               align_cond=lambda pos: pos % 512 == 0):
-
-    g = globals()
-    for i, v in enumerate(['dst', 'fill', 'length', 'qpu_num', 'stride']):
-        g[f'reg_{v}'] = rf[i]
+def qpu_memset(
+    asm: Assembly,
+    *,
+    num_qpus: int,
+    unroll_shift: int,
+    code_offset: int,
+    align_cond: Callable[[int], bool] = lambda pos: pos % 512 == 0,
+) -> None:
+    reg_dst = rf0
+    reg_fill = rf1
+    reg_length = rf2
+    reg_qpu_num = rf3
+    reg_stride = rf4
 
     nop(sig=ldunifrf(reg_dst))
     nop(sig=ldunifrf(reg_fill))
@@ -50,7 +55,7 @@ def qpu_memset(asm, *, num_qpus, unroll_shift, code_offset,
         shr(r0, r0, 2)
         band(reg_qpu_num, r0, 0b1111)
     else:
-        raise Exception('num_qpus must be 1 or 8')
+        raise Exception("num_qpus must be 1 or 8")
 
     # addr += 4 * 4 * (thread_num + 16 * qpu_num)
     shl(r0, reg_qpu_num, 4)
@@ -69,8 +74,7 @@ def qpu_memset(asm, *, num_qpus, unroll_shift, code_offset,
     while not align_cond(code_offset + len(asm)):
         nop()
 
-    with loop as l:
-
+    with loop as l:  # noqa: E741
         unroll = 1 << unroll_shift
 
         for i in range(unroll // 4 - 1):
@@ -81,9 +85,9 @@ def qpu_memset(asm, *, num_qpus, unroll_shift, code_offset,
             mov(tmuau if i % 4 == 0 else tmua, reg_dst).add(reg_dst, reg_dst, reg_stride)
 
         mov(tmud, reg_fill).mov(r0, 1)
-        mov(tmud, reg_fill).sub(reg_length, reg_length, r0, cond='pushz')
+        mov(tmud, reg_fill).sub(reg_length, reg_length, r0, cond="pushz")
 
-        l.b(cond='na0').unif_addr(absolute=False)
+        l.b(cond="na0").unif_addr(absolute=False)
         mov(tmud, reg_fill)
         mov(tmud, reg_fill)
         mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_stride)
@@ -98,51 +102,45 @@ def qpu_memset(asm, *, num_qpus, unroll_shift, code_offset,
     nop()
 
 
-def memset(*, fill, length, num_qpus=8, unroll_shift=5):
-
+def memset(*, fill: int, length: int, num_qpus: int = 8, unroll_shift: int = 5) -> None:
     assert length > 0
     assert length % (16 * num_qpus * (1 << unroll_shift)) == 0
     assert unroll_shift >= 4
 
-    print(f'==== memset example ({length * 4 / 1024 / 1024} MiB) ====')
+    print(f"==== memset example ({length * 4 / 1024 / 1024} MiB) ====")
 
     with Driver(data_area_size=(length + 1024) * 4) as drv:
+        code = drv.program(qpu_memset, num_qpus=num_qpus, unroll_shift=unroll_shift, code_offset=drv.code_pos // 8)
 
-        code = drv.program(qpu_memset, num_qpus=num_qpus,
-                           unroll_shift=unroll_shift,
-                           code_offset=drv.code_pos // 8)
+        print("Preparing for buffers...")
 
-        print('Preparing for buffers...')
+        x: Array[np.uint32] = drv.alloc(length, dtype=np.uint32)
 
-        X = drv.alloc(length, dtype='uint32')
+        x.fill(~fill & 0xFFFFFFFF)
 
-        X.fill(~fill & 0xFFFFFFFF)
+        assert not np.array_equiv(x, fill)
 
-        assert not np.array_equiv(X, fill)
-
-        unif = drv.alloc(3 + (1 << (unroll_shift - 4)) + 1, dtype='uint32')
-        unif[0] = X.addresses()[0]
+        unif: Array[np.uint32] = drv.alloc(3 + (1 << (unroll_shift - 4)) + 1, dtype=np.uint32)
+        unif[0] = x.addresses()[0]
         unif[1] = fill
         unif[2] = length
-        unif[3: -1] = 0xfcfcfcfc
+        unif[3:-1] = 0xFCFCFCFC
         unif[-1] = 4 * (-len(unif) + 3) & 0xFFFFFFFF
 
-        print('Executing on QPU...')
+        print("Executing on QPU...")
 
         start = monotonic()
         drv.execute(code, unif.addresses()[0], thread=num_qpus)
         end = monotonic()
 
-        assert np.array_equiv(X, fill)
+        assert np.array_equiv(x, fill)
 
-        print(f'{end - start} sec, {length * 4 / (end - start) * 1e-6} MB/s')
-
-
-def main():
-
-    memset(fill=0x5a5a5a5a, length=16 * 1024 * 1024)
+        print(f"{end - start} sec, {length * 4 / (end - start) * 1e-6} MB/s")
 
 
-if __name__ == '__main__':
+def main() -> None:
+    memset(fill=0x5A5A5A5A, length=16 * 1024 * 1024)
 
+
+if __name__ == "__main__":
     main()

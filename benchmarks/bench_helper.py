@@ -1,4 +1,3 @@
-
 # Copyright (c) 2019-2020 Idein Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,32 +18,34 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
 import subprocess
 from ctypes import cdll
+from typing import Self
+
 import numpy as np
+import numpy.typing as npt
 
-class BenchHelper(object):
 
-    def __init__(self, path = './libbench_helper.so'):
-
+class BenchHelper:
+    def __init__(self: Self, path: str = "./libbench_helper.so") -> None:
         try:
             self.lib = cdll.LoadLibrary(path)
         except OSError:
-            subprocess.run(f'gcc -O2 -shared -fPIC -o {path} -xc -'.split(), text=True,
-                           input='''
+            subprocess.run(
+                f"gcc -O2 -shared -fPIC -o {path} -xc -".split(),
+                text=True,
+                input="""
 #include <stdint.h>
 void wait_address(uint32_t volatile * p) {
     while(p[0] == 0){}
 }
-'''
+""",
             )
             self.lib = cdll.LoadLibrary(path)
-
 
         self.lib.wait_address.argtypes = [
             np.ctypeslib.ndpointer(dtype=np.uint32, shape=(1,), flags="C_CONTIGUOUS"),
         ]
 
-    def wait_address(self, done):
+    def wait_address(self: Self, done: npt.NDArray[np.uint32]) -> None:
         self.lib.wait_address(done)

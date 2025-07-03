@@ -1,4 +1,3 @@
-
 # Copyright (c) 2019-2020 Idein Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -21,14 +20,14 @@
 # SOFTWARE.
 
 
-__version__ = '0.0.0'
+__version__ = "0.0.0"
 
 
 import struct
+from typing import Any
 
 
-def pack_unpack(pack, unpack, v):
-
+def pack_unpack(pack: str | bytes, unpack: str | bytes, v: Any) -> Any:
     if isinstance(v, list):
         return [struct.unpack(unpack, struct.pack(pack, _))[0] for _ in v]
 

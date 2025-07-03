@@ -1,4 +1,3 @@
-
 # Copyright (c) 2019-2020 Idein Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,17 +18,14 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
 import time
 
 from videocore6.v3d import *
 
 with RegisterMapping() as regmap:
-
     with PerformanceCounter(regmap, [CORE_PCTR_CYCLE_COUNT]) as pctr:
-
         time.sleep(1)
         result = pctr.result()
 
-print('==== QPU clock measurement with performance counters ====')
-print(f'{result[0] * 1e-6} MHz')
+print("==== QPU clock measurement with performance counters ====")
+print(f"{result[0] * 1e-6} MHz")

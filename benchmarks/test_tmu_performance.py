@@ -1,4 +1,3 @@
-
 # Copyright (c) 2019-2020 Idein Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,37 +18,36 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
-
 import time
-from videocore6.driver import Driver
-from videocore6.assembler import qpu
-import numpy as np
+
 import matplotlib.pyplot as plt
+import numpy as np
 from bench_helper import BenchHelper
+
+from videocore6.assembler import *
+from videocore6.driver import Array, Driver
 
 
 @qpu
-def qpu_tmu_load_1_slot_1_qpu(asm, nops):
+def qpu_tmu_load_1_slot_1_qpu(asm: Assembly, nops: int) -> None:
+    nop(sig=ldunifrf(rf0))  # X.shape[1]
+    nop(sig=ldunifrf(rf1))  # X
+    nop(sig=ldunifrf(rf2))  # X.stride[1]
+    nop(sig=ldunifrf(rf3))  # X.stride[0]
+    nop(sig=ldunifrf(rf4))  # Y
+    nop(sig=ldunifrf(rf5))  # done
 
-    nop(sig = ldunifrf(rf0)) # X.shape[1]
-    nop(sig = ldunifrf(rf1)) # X
-    nop(sig = ldunifrf(rf2)) # X.stride[1]
-    nop(sig = ldunifrf(rf3)) # X.stride[0]
-    nop(sig = ldunifrf(rf4)) # Y
-    nop(sig = ldunifrf(rf5)) # done
-
-    barrierid(syncb, sig = thrsw)
+    barrierid(syncb, sig=thrsw)
     nop()
     nop()
 
     tidx(r0)
     shr(r0, r0, 2)
-    band(r0, r0, 0b1111, cond = 'pushz')
-    b(R.done, cond = 'allna')
-    nop() # delay slot
-    nop() # delay slot
-    nop() # delay slot
+    band(r0, r0, 0b1111, cond="pushz")
+    b(R.done, cond="allna")
+    nop()  # delay slot
+    nop()  # delay slot
+    nop()  # delay slot
 
     eidx(r0)
     shl(r0, r0, 2)
@@ -60,16 +58,16 @@ def qpu_tmu_load_1_slot_1_qpu(asm, nops):
     add(rf1, rf1, r0)
 
     mov(r2, 0.0)
-    with loop as l:
+    with loop as l:  # noqa: E741
         mov(tmua, rf1).add(rf1, rf1, rf2)
         for i in range(nops):
             nop()
-        nop(sig = ldtmu(r3))
-        sub(rf0, rf0, 1, cond = 'pushz')
-        l.b(cond = 'anyna')
-        fadd(r2, r2, r3) # delay slot
-        nop()            # delay slot
-        nop()            # delay slot
+        nop(sig=ldtmu(r3))
+        sub(rf0, rf0, 1, cond="pushz")
+        l.b(cond="anyna")
+        fadd(r2, r2, r3)  # delay slot
+        nop()  # delay slot
+        nop()  # delay slot
 
     mov(tmud, r2)
     mov(tmua, rf4)
@@ -80,97 +78,92 @@ def qpu_tmu_load_1_slot_1_qpu(asm, nops):
     tmuwt()
 
     L.done
-    barrierid(syncb, sig = thrsw)
+    barrierid(syncb, sig=thrsw)
     nop()
     nop()
 
-    nop(sig = thrsw)
-    nop(sig = thrsw)
+    nop(sig=thrsw)
+    nop(sig=thrsw)
     nop()
     nop()
-    nop(sig = thrsw)
+    nop(sig=thrsw)
     nop()
     nop()
     nop()
 
-def test_tmu_load_1_slot_1_qpu():
 
-    bench = BenchHelper('benchmarks/libbench_helper.so')
+def test_tmu_load_1_slot_1_qpu() -> None:
+    bench = BenchHelper("benchmarks/libbench_helper.so")
 
     for trans in [False, True]:
-
         with Driver() as drv:
-
             loop = 2**15
 
-            X = drv.alloc((16, loop) if trans else (loop, 16), dtype = 'float32')
-            Y = drv.alloc(16, dtype = 'float32')
-            unif = drv.alloc(6, dtype = 'uint32')
-            done = drv.alloc(1, dtype = 'uint32')
+            x: Array[np.float32] = drv.alloc((16, loop) if trans else (loop, 16), dtype=np.float32)
+            y: Array[np.float32] = drv.alloc(16, dtype=np.float32)
+            unif: Array[np.uint32] = drv.alloc(6, dtype=np.uint32)
+            done: Array[np.uint32] = drv.alloc(1, dtype=np.uint32)
 
             unif[0] = loop
-            unif[1] = X.addresses()[0,0]
-            unif[2] = X.strides[int(trans)]
-            unif[3] = X.strides[1-int(trans)]
-            unif[4] = Y.addresses()[0]
+            unif[1] = x.addresses()[0, 0]
+            unif[2] = x.strides[int(trans)]
+            unif[3] = x.strides[1 - int(trans)]
+            unif[4] = y.addresses()[0]
             unif[5] = done.addresses()[0]
 
-            results = np.zeros((24, 10), dtype = 'float32')
+            results = np.zeros((24, 10), dtype=np.float32)
 
             fig = plt.figure()
-            ax = fig.add_subplot(1,1,1)
-            ax.set_title(f'TMU load latency (1 slot, 1 qpu, stride=({unif[2]},{unif[3]}))')
-            ax.set_xlabel('# of nop (between request and load signal)')
-            ax.set_ylabel('sec')
+            ax = fig.add_subplot(1, 1, 1)
+            ax.set_title(f"TMU load latency (1 slot, 1 qpu, stride=({unif[2]},{unif[3]}))")
+            ax.set_xlabel("# of nop (between request and load signal)")
+            ax.set_ylabel("sec")
 
             print()
             for nops in range(results.shape[0]):
-
                 code = drv.program(lambda asm: qpu_tmu_load_1_slot_1_qpu(asm, nops))
 
                 for i in range(results.shape[1]):
-
                     with drv.compute_shader_dispatcher() as csd:
-
-                        X[:] = np.random.randn(*X.shape) / X.shape[int(trans)]
-                        Y[:] = 0.0
+                        x[:] = np.random.randn(*x.shape) / x.shape[int(trans)]
+                        y[:] = 0.0
                         done[:] = 0
 
                         start = time.time()
-                        csd.dispatch(code, unif.addresses()[0], thread = 8)
+                        csd.dispatch(code, unif.addresses()[0], thread=8)
                         bench.wait_address(done)
                         end = time.time()
 
-                        results[nops,i] = end - start
+                        results[nops, i] = end - start
 
-                        assert np.allclose(Y, np.sum(X, axis=int(trans)), atol = 1e-4)
+                        assert np.allclose(y, np.sum(x, axis=int(trans)), atol=1e-4)
 
-                ax.scatter(np.zeros(results.shape[1])+nops, results[nops], s=1, c='blue')
+                ax.scatter(np.zeros(results.shape[1]) + nops, results[nops], s=1, c="blue")
 
-                print('{:4}/{}\t{:.9f}'.format(nops, results.shape[0], np.sum(results[nops]) / results.shape[1]))
+                print(f"{nops:4}/{results.shape[0]}\t{np.sum(results[nops]) / results.shape[1]:.9f}")
 
             ax.set_ylim(auto=True)
             ax.set_xlim(0, results.shape[0])
-            fig.savefig(f'benchmarks/tmu_load_1_slot_1_qpu_{unif[2]}_{unif[3]}.png')
+            fig.savefig(f"benchmarks/tmu_load_1_slot_1_qpu_{unif[2]}_{unif[3]}.png")
+
 
 @qpu
-def qpu_tmu_load_2_slot_1_qpu(asm, nops):
+def qpu_tmu_load_2_slot_1_qpu(asm: Assembly, nops: int) -> None:
+    nop(sig=ldunifrf(rf0))  # X.shape[1]
+    nop(sig=ldunifrf(rf1))  # X
+    nop(sig=ldunifrf(rf2))  # X.stride[1]
+    nop(sig=ldunifrf(rf3))  # X.stride[0]
+    nop(sig=ldunifrf(rf4))  # Y
+    nop(sig=ldunifrf(rf5))  # done
 
-    nop(sig = ldunifrf(rf0)) # X.shape[1]
-    nop(sig = ldunifrf(rf1)) # X
-    nop(sig = ldunifrf(rf2)) # X.stride[1]
-    nop(sig = ldunifrf(rf3)) # X.stride[0]
-    nop(sig = ldunifrf(rf4)) # Y
-    nop(sig = ldunifrf(rf5)) # done
-
-    barrierid(syncb, sig = thrsw)
+    barrierid(syncb, sig=thrsw)
     nop()
     nop()
 
     tidx(r0)
     shr(r0, r0, 2)
-    band(r0, r0, 0b0011, cond = 'pushz')
-    b(R.skip_bench, cond = 'allna')
+    band(r0, r0, 0b0011, cond="pushz")
+    b(R.skip_bench, cond="allna")
     nop()
     nop()
     nop()
@@ -196,16 +189,16 @@ def qpu_tmu_load_2_slot_1_qpu(asm, nops):
     add(rf1, rf1, r0)
 
     mov(r2, 0.0)
-    with loop as l:
+    with loop as l:  # noqa: E741
         mov(tmua, rf1).add(rf1, rf1, rf2)
         for i in range(nops):
             nop()
-        nop(sig = ldtmu(r3))
-        sub(rf0, rf0, 1, cond = 'pushz')
-        l.b(cond = 'anyna')
-        fadd(r2, r2, r3) # delay slot
-        nop()            # delay slot
-        nop()            # delay slot
+        nop(sig=ldtmu(r3))
+        sub(rf0, rf0, 1, cond="pushz")
+        l.b(cond="anyna")
+        fadd(r2, r2, r3)  # delay slot
+        nop()  # delay slot
+        nop()  # delay slot
 
     mov(tmud, r2)
     mov(tmua, rf4)
@@ -213,14 +206,14 @@ def qpu_tmu_load_2_slot_1_qpu(asm, nops):
 
     L.skip_bench
 
-    barrierid(syncb, sig = thrsw)
+    barrierid(syncb, sig=thrsw)
     nop()
     nop()
 
     tidx(r0)
     shr(r0, r0, 2)
-    band(r0, r0, 0b1111, cond = 'pushz')
-    b(R.skip_done, cond = 'allna')
+    band(r0, r0, 0b1111, cond="pushz")
+    b(R.skip_done, cond="allna")
     nop()
     nop()
     nop()
@@ -229,73 +222,68 @@ def qpu_tmu_load_2_slot_1_qpu(asm, nops):
     tmuwt()
     L.skip_done
 
-    nop(sig = thrsw)
-    nop(sig = thrsw)
+    nop(sig=thrsw)
+    nop(sig=thrsw)
     nop()
     nop()
-    nop(sig = thrsw)
+    nop(sig=thrsw)
     nop()
     nop()
     nop()
 
-def test_tmu_load_2_slot_1_qpu():
 
-    bench = BenchHelper('benchmarks/libbench_helper.so')
+def test_tmu_load_2_slot_1_qpu() -> None:
+    bench = BenchHelper("benchmarks/libbench_helper.so")
 
-    for trans, min_nops, max_nops in [(False, 0, 64), (True, 128-32, 128+32)]:
-
+    for trans, min_nops, max_nops in [(False, 0, 64), (True, 128 - 32, 128 + 32)]:
         with Driver() as drv:
-
             loop = 2**13
 
-            X = drv.alloc((8, 16, loop) if trans else (8, loop, 16), dtype = 'float32')
-            Y = drv.alloc((8, 16), dtype = 'float32')
-            unif = drv.alloc(6, dtype = 'uint32')
-            done = drv.alloc(1, dtype = 'uint32')
+            x: Array[np.float32] = drv.alloc((8, 16, loop) if trans else (8, loop, 16), dtype=np.float32)
+            y: Array[np.float32] = drv.alloc((8, 16), dtype=np.float32)
+            unif: Array[np.uint32] = drv.alloc(6, dtype=np.uint32)
+            done: Array[np.uint32] = drv.alloc(1, dtype=np.uint32)
 
             unif[0] = loop
-            unif[1] = X.addresses()[0,0,0]
-            unif[2] = X.strides[1+int(trans)]
-            unif[3] = X.strides[2-int(trans)]
-            unif[4] = Y.addresses()[0,0]
+            unif[1] = x.addresses()[0, 0, 0]
+            unif[2] = x.strides[1 + int(trans)]
+            unif[3] = x.strides[2 - int(trans)]
+            unif[4] = y.addresses()[0, 0]
             unif[5] = done.addresses()[0]
 
-            results = np.zeros((max_nops, 10), dtype = 'float32')
+            results = np.zeros((max_nops, 10), dtype=np.float32)
 
             fig = plt.figure()
-            ax = fig.add_subplot(1,1,1)
-            ax.set_title(f'TMU load latency (2 slot, 1 qpu, stride=({unif[2]},{unif[3]}))')
-            ax.set_xlabel('# of nop (between request and load signal)')
-            ax.set_ylabel('sec')
+            ax = fig.add_subplot(1, 1, 1)
+            ax.set_title(f"TMU load latency (2 slot, 1 qpu, stride=({unif[2]},{unif[3]}))")
+            ax.set_xlabel("# of nop (between request and load signal)")
+            ax.set_ylabel("sec")
 
             print()
             for nops in range(min_nops, results.shape[0]):
-
                 code = drv.program(lambda asm: qpu_tmu_load_2_slot_1_qpu(asm, nops))
 
                 for i in range(results.shape[1]):
-
                     with drv.compute_shader_dispatcher() as csd:
-
-                        X[:] = np.random.randn(*X.shape) / X.shape[1+int(trans)]
-                        Y[:] = 0.0
+                        x[:] = np.random.randn(*x.shape) / x.shape[1 + int(trans)]
+                        y[:] = 0.0
                         done[:] = 0
 
                         start = time.time()
-                        csd.dispatch(code, unif.addresses()[0], thread = 8)
+                        csd.dispatch(code, unif.addresses()[0], thread=8)
                         bench.wait_address(done)
                         end = time.time()
 
-                        results[nops,i] = end - start
+                        results[nops, i] = end - start
 
-                        assert np.allclose(Y[0::4], np.sum(X[0::4], axis=1+int(trans)), atol = 1e-4)
-                        assert (Y[1:4] == 0).all()
-                        assert (Y[5:8] == 0).all()
+                        assert np.allclose(y[0::4], np.sum(x[0::4], axis=1 + int(trans)), atol=1e-4)
+                        assert (y[1:4] == 0).all()
+                        assert (y[5:8] == 0).all()
 
-                ax.scatter(np.zeros(results.shape[1])+nops, results[nops], s=1, c='blue')
+                ax.scatter(np.zeros(results.shape[1]) + nops, results[nops], s=1, c="blue")
 
-                print('{:4}/{}\t{:.9f}'.format(nops, results.shape[0], np.sum(results[nops]) / results.shape[1]))
+                print(f"{nops:4}/{results.shape[0]}\t{np.sum(results[nops]) / results.shape[1]:.9f}")
 
             ax.set_ylim(auto=True)
             ax.set_xlim(min_nops, max_nops)
-            fig.savefig(f'benchmarks/tmu_load_2_slot_1_qpu_{unif[2]}_{unif[3]}.png')
+            fig.savefig(f"benchmarks/tmu_load_2_slot_1_qpu_{unif[2]}_{unif[3]}.png")
