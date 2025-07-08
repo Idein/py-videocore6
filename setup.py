@@ -1,4 +1,3 @@
-
 # Copyright (c) 2019-2020 Idein Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,34 +18,13 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
-
 import platform
 
-from setuptools import setup, Extension
-
-from videocore6 import __version__ as version
-
+from setuptools import Extension, setup
 
 ext_modules = []
 
-if platform.machine() in ['armv7l', 'aarch64']:
-    ext_modules.append(Extension('videocore6.readwrite4',
-                                 sources = ['videocore6/readwrite4.c']))
+# if platform.machine() in ["armv7l", "aarch64"]:
+#     ext_modules.append(Extension("_videocore6.readwrite4", sources=["src/_videocore6/readwrite4/module.c"]))
 
-setup(
-        name = 'py-videocore6',
-        packages = [
-                'videocore6',
-        ],
-        version = version,
-        description = 'Python library for GPGPU programming on Raspberry Pi 4',
-        author = 'Sugizaki Yukimasa',
-        author_email = 'ysugi@idein.jp',
-        install_requires = [
-                'ioctl-opt >= 1.2',
-                'numpy',
-        ],
-        ext_modules = ext_modules,
-        python_requires = '~= 3.7',  # for f-string.
-)
+setup(ext_modules=ext_modules)

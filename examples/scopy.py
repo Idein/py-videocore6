@@ -1,4 +1,3 @@
-
 # Copyright (c) 2019-2020 Idein Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,23 +18,29 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
-
+from collections.abc import Callable
 from time import monotonic
 
 import numpy as np
 
-from videocore6.assembler import qpu
-from videocore6.driver import Driver
+from videocore6.assembler import *
+from videocore6.driver import Array, Driver
 
 
 @qpu
-def qpu_scopy(asm, *, num_qpus, unroll_shift, code_offset,
-              align_cond=lambda pos: pos % 512 == 259):
-
-    g = globals()
-    for i, v in enumerate(['length', 'src', 'dst', 'qpu_num', 'stride']):
-        g[f'reg_{v}'] = rf[i]
+def qpu_scopy(
+    asm: Assembly,
+    *,
+    num_qpus: int,
+    unroll_shift: int,
+    code_offset: int,
+    align_cond: Callable[[int], bool] = lambda pos: pos % 512 == 259,
+) -> None:
+    reg_length = rf0
+    reg_src = rf1
+    reg_dst = rf2
+    reg_qpu_num = rf3
+    reg_stride = rf4
 
     nop(sig=ldunifrf(reg_length))
     nop(sig=ldunifrf(reg_src))
@@ -50,7 +55,7 @@ def qpu_scopy(asm, *, num_qpus, unroll_shift, code_offset,
         shr(r0, r0, 2)
         band(reg_qpu_num, r0, 0b1111)
     else:
-        raise Exception('num_qpus must be 1 or 8')
+        raise Exception("num_qpus must be 1 or 8")
 
     # addr += 4 * 4 * (thread_num + 16 * qpu_num)
     shl(r0, reg_qpu_num, 4)
@@ -79,8 +84,7 @@ def qpu_scopy(asm, *, num_qpus, unroll_shift, code_offset,
     while not align_cond(code_offset + len(asm)):
         nop()
 
-    with loop as l:
-
+    with loop as l:  # noqa: E741
         unroll = 1 << unroll_shift
 
         # A smaller number of instructions does not necessarily mean a faster
@@ -117,16 +121,16 @@ def qpu_scopy(asm, *, num_qpus, unroll_shift, code_offset,
         mov(tmud, r0, sig=ldtmu(r0))
         mov(tmud, r0)
         nop(sig=ldtmu(r0))
-        sub(reg_length, reg_length, 1, cond='pushz').mov(tmud, r0)
+        sub(reg_length, reg_length, 1, cond="pushz").mov(tmud, r0)
         mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_stride)
 
         if unroll == 1:
-            mov(tmuc, 0xfffffffc)
+            mov(tmuc, 0xFFFFFFFC)
         nop(sig=ldtmu(r0))
         mov(tmud, r0, sig=ldtmu(r0))
         mov(tmud, r0, sig=ldtmu(r0))
 
-        l.b(cond='na0').unif_addr(absolute=False)
+        l.b(cond="na0").unif_addr(absolute=False)
         mov(tmud, r0, sig=ldtmu(r0))
         mov(tmud, r0)
         mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_stride)
@@ -147,55 +151,49 @@ def qpu_scopy(asm, *, num_qpus, unroll_shift, code_offset,
     nop()
 
 
-def scopy(*, length, num_qpus=8, unroll_shift=0):
-
+def scopy(*, length: int, num_qpus: int = 8, unroll_shift: int = 0) -> None:
     assert length > 0
     assert length % (16 * 8 * num_qpus * (1 << unroll_shift)) == 0
 
-    print(f'==== scopy example ({length / 1024 / 1024} Mi elements) ====')
+    print(f"==== scopy example ({length / 1024 / 1024} Mi elements) ====")
 
     with Driver(data_area_size=(length * 2 + 1024) * 4) as drv:
+        code = drv.program(qpu_scopy, num_qpus=num_qpus, unroll_shift=unroll_shift, code_offset=drv.code_pos // 8)
 
-        code = drv.program(qpu_scopy, num_qpus=num_qpus,
-                           unroll_shift=unroll_shift,
-                           code_offset=drv.code_pos // 8)
+        print("Preparing for buffers...")
 
-        print('Preparing for buffers...')
+        x: Array[np.uint32] = drv.alloc(length, dtype=np.uint32)
+        y: Array[np.uint32] = drv.alloc(length, dtype=np.uint32)
 
-        X = drv.alloc(length, dtype='uint32')
-        Y = drv.alloc(length, dtype='uint32')
+        x[:] = np.arange(*x.shape, dtype=x.dtype)
+        y[:] = -x
 
-        X[:] = np.arange(*X.shape, dtype=X.dtype)
-        Y[:] = -X
+        assert not np.array_equal(x, y)
 
-        assert not np.array_equal(X, Y)
-
-        unif = drv.alloc(3 + (1 << unroll_shift) + 1, dtype='uint32')
+        unif: Array[np.uint32] = drv.alloc(3 + (1 << unroll_shift) + 1, dtype=np.uint32)
         unif[0] = length
-        unif[1] = X.addresses()[0]
-        unif[2] = Y.addresses()[0]
+        unif[1] = x.addresses()[0]
+        unif[2] = y.addresses()[0]
         if unroll_shift == 0:
-            unif[3] = 0xfc80fcfc
+            unif[3] = 0xFC80FCFC
         else:
-            unif[3: -1] = 0xfcfcfcfc
+            unif[3:-1] = 0xFCFCFCFC
         unif[-1] = 4 * (-len(unif) + 3) & 0xFFFFFFFF
 
-        print('Executing on QPU...')
+        print("Executing on QPU...")
 
         start = monotonic()
         drv.execute(code, unif.addresses()[0], thread=num_qpus)
         end = monotonic()
 
-        assert np.array_equal(X, Y)
+        assert np.array_equal(x, y)
 
-        print(f'{end - start} sec, {length * 4 / (end - start) * 1e-6} MB/s')
+        print(f"{end - start} sec, {length * 4 / (end - start) * 1e-6} MB/s")
 
 
-def main():
-
+def main() -> None:
     scopy(length=16 * 1024 * 1024)
 
 
-if __name__ == '__main__':
-
+if __name__ == "__main__":
     main()

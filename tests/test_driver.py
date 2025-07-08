@@ -1,4 +1,3 @@
-
 # Copyright (c) 2019-2020 Idein Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -20,19 +19,21 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from videocore6.driver import Driver
+import numpy as np
 
-def test_mem():
+from videocore6.driver import Array, Driver
+
+
+def test_mem() -> None:
     print()
 
     with Driver() as drv:
-
         n = 4
-        a = [None] * n
+        a: list[Array[np.uint32]] = []
         off = 42
 
         for i in range(n):
-            a[i] = drv.alloc((256 * 1024), dtype = 'uint32')
+            a.append(drv.alloc((256 * 1024), dtype=np.uint32))
             a[i][:] = range(i, a[i].shape[0] * n, n)
             a[i][:] += off
 

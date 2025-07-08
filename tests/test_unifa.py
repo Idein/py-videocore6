@@ -1,4 +1,3 @@
-
 # Copyright (c) 2021 Idein Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,23 +18,19 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
-
-from videocore6.assembler import qpu
-from videocore6.driver import Driver
-
 import numpy as np
+
+from videocore6.assembler import *
+from videocore6.driver import Array, Driver
 
 
 @qpu
-def qpu_unifa(asm):
-
+def qpu_unifa(asm: Assembly) -> None:
     reg_n = rf0
     reg_src0 = rf1
     reg_src1 = rf2
     reg_dst = rf3
     reg_inc = rf4
-    reg_tmp = rf5
 
     nop(sig=ldunifrf(reg_n))
     nop(sig=ldunifrf(reg_src0))
@@ -55,27 +50,27 @@ def qpu_unifa(asm):
     # Three delays are required for the data to be ready.
     nop()
     nop()
-    sub(r0, reg_n, 1, cond='pushz')
+    sub(r0, reg_n, 1, cond="pushz")
     L.l0
     nop(sig=ldunifa)
-    b(R.l0, cond='na0')
+    b(R.l0, cond="na0")
     mov(tmud, r5)
     mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_inc)
-    sub(r0, r0, 1, cond='pushz')
+    sub(r0, r0, 1, cond="pushz")
 
     # Ordinary uniform and sideband uniform simultaneous reads.
-    b(R.l1, cond='always').unif_addr(reg_src0)
+    b(R.l1, cond="always").unif_addr(reg_src0)
     mov(unifa, reg_src1)
-    sub(r0, reg_n, 1, cond='pushz')
+    sub(r0, reg_n, 1, cond="pushz")
     nop()
     L.l1
     nop(sig=ldunif)
     mov(tmud, r5, sig=ldunifa)
     mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_inc)
-    b(R.l1, cond='na0')
+    b(R.l1, cond="na0")
     mov(tmud, r5)
     mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_inc)
-    sub(r0, r0, 1, cond='pushz')
+    sub(r0, r0, 1, cond="pushz")
 
     # Check if the two uniform streams proceed mutually-exclusively.
     #
@@ -102,20 +97,20 @@ def qpu_unifa(asm):
     shr(r0, reg_n, 1)
     mov(unifa, reg_src0).add(reg_src0, reg_src0, 4)
     L.l2
-    b(R.l3, cond='always').unif_addr(reg_src1)                      # T0
+    b(R.l3, cond="always").unif_addr(reg_src1)  # T0
     add(reg_src1, reg_src1, 8)
-    sub(r0, r0, 1, cond='pushz')
+    sub(r0, r0, 1, cond="pushz")
     nop()
     L.l3
-    nop(sig=ldunif)                                                 # T1
+    nop(sig=ldunif)  # T1
     mov(tmud, r5)
-    mov(tmua, reg_dst, sig=ldunifa).mov(unifa, reg_src0)            # T2, T3
+    mov(tmua, reg_dst, sig=ldunifa).mov(unifa, reg_src0)  # T2, T3
     mov(tmud, r5)
     add(reg_dst, reg_dst, reg_inc)
     add(reg_src0, reg_src0, 8)
     mov(tmua, reg_dst, sig=ldunifa).add(reg_dst, reg_dst, reg_inc)  # T4
-    mov(tmud, r5, sig=ldunif)                                       # T5
-    b(R.l2, cond='na0')
+    mov(tmud, r5, sig=ldunif)  # T5
+    b(R.l2, cond="na0")
     mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_inc)
     mov(tmud, r5)
     mov(tmua, reg_dst).add(reg_dst, reg_dst, reg_inc)
@@ -130,23 +125,21 @@ def qpu_unifa(asm):
     nop()
 
 
-def test_unifa():
-
+def test_unifa() -> None:
     n = 548
 
     assert n >= 2 and n % 2 == 0
 
     with Driver() as drv:
-
         code = drv.program(qpu_unifa)
-        unif = drv.alloc(4, dtype='uint32')
-        src0 = drv.alloc(n, dtype='uint32')
-        src1 = drv.alloc(n, dtype='uint32')
-        dst = drv.alloc((n * 5, 16), dtype='uint32')
+        unif: Array[np.uint32] = drv.alloc(4, dtype=np.uint32)
+        src0: Array[np.uint32] = drv.alloc(n, dtype=np.uint32)
+        src1: Array[np.uint32] = drv.alloc(n, dtype=np.uint32)
+        dst: Array[np.uint32] = drv.alloc((n * 5, 16), dtype=np.uint32)
 
         rng = np.random.default_rng()
-        src0[:] = rng.integers(1, 2 ** 32 - 1, size=n)
-        src1[:] = rng.integers(1, 2 ** 32 - 1, size=n)
+        src0[:] = rng.integers(1, 2**32 - 1, size=n)
+        src1[:] = rng.integers(1, 2**32 - 1, size=n)
         dst[:, :] = 0
 
         unif[0] = n

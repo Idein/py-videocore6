@@ -1,4 +1,5 @@
-
+# setuptools-scm generate file
+src/_videocore6/_version.py
 
 # Created by https://www.gitignore.io/api/git,vim,linux,emacs,python
 # Edit at https://www.gitignore.io/?templates=git,vim,linux,emacs,python

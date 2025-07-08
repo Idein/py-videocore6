@@ -1,4 +1,3 @@
-
 # Copyright (c) 2019-2020 Idein Inc.
 #
 # Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -19,19 +18,16 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-
-
-import time
-from videocore6.driver import Driver
-from videocore6.assembler import qpu
 import numpy as np
+
+from videocore6.assembler import *
+from videocore6.driver import Array, Driver
 
 
 @qpu
-def qpu_tmu_write(asm):
-
-    nop(sig = ldunif)
-    mov(r1, r5, sig = ldunif)
+def qpu_tmu_write(asm: Assembly) -> None:
+    nop(sig=ldunif)
+    mov(r1, r5, sig=ldunif)
 
     # r2 = addr + eidx * 4
     # rf0 = eidx
@@ -39,67 +35,59 @@ def qpu_tmu_write(asm):
     shl(r0, r0, 2).mov(rf0, r0)
     add(r2, r2, r0)
 
-    with loop as l:
-
+    with loop as l:  # noqa: E741
         # rf0: Data to be written.
         # r0: Overwritten.
         # r2: Address to write data to.
 
-        sub(r1, r1, 1, cond = 'pushz').mov(tmud, rf0)
-        l.b(cond = 'anyna')
+        sub(r1, r1, 1, cond="pushz").mov(tmud, rf0)
+        l.b(cond="anyna")
         # rf0 += 16
         sub(rf0, rf0, -16).mov(tmua, r2)
         # r2 += 64
         shl(r0, 4, 4)
         tmuwt().add(r2, r2, r0)
 
-    nop(sig = thrsw)
-    nop(sig = thrsw)
+    nop(sig=thrsw)
+    nop(sig=thrsw)
     nop()
     nop()
-    nop(sig = thrsw)
+    nop(sig=thrsw)
     nop()
     nop()
     nop()
 
 
-def test_tmu_write():
-
+def test_tmu_write() -> None:
     n = 4096
 
-    with Driver(data_area_size = n * 16 * 4 + 2 * 4) as drv:
-
+    with Driver(data_area_size=n * 16 * 4 + 2 * 4) as drv:
         code = drv.program(qpu_tmu_write)
-        data = drv.alloc(n * 16, dtype = 'uint32')
-        unif = drv.alloc(2, dtype = 'uint32')
+        data: Array[np.uint32] = drv.alloc(n * 16, dtype=np.uint32)
+        unif: Array[np.uint32] = drv.alloc(2, dtype=np.uint32)
 
-        data[:] = 0xdeadbeaf
+        data[:] = 0xDEADBEAF
         unif[0] = n
         unif[1] = data.addresses()[0]
 
-        start = time.time()
         drv.execute(code, unif.addresses()[0])
-        end = time.time()
 
         assert all(data == range(n * 16))
 
 
 @qpu
-def qpu_tmu_vec_write(asm, configs, vec_offset):
-
+def qpu_tmu_vec_write(asm: Assembly, configs: list[int], vec_offset: int) -> None:
     reg_addr = rf0
     reg_n = rf1
 
     nop(sig=ldunifrf(reg_addr))
     nop(sig=ldunifrf(reg_n))
 
-    with loop as l:
-
+    with loop as l:  # noqa: E741
         assert 1 <= len(configs) <= 4
         for i, config in enumerate(configs):
-
             eidx(r0)
-            shl(r0, r0, 0xfffffff0)  # 0xfffffff0 % 32 = 16
+            shl(r0, r0, 0xFFFFFFF0)  # 0xfffffff0 % 32 = 16
             assert 1 <= config <= 4
             for j in range(config):
                 mov(tmud, r0).add(r0, r0, 1)
@@ -116,24 +104,23 @@ def qpu_tmu_vec_write(asm, configs, vec_offset):
             umul24(r0, r0, len(configs))
             add(reg_addr, reg_addr, r0)
 
-        sub(reg_n, reg_n, 1, cond='pushz')
-        l.b(cond='na0')
+        sub(reg_n, reg_n, 1, cond="pushz")
+        l.b(cond="na0")
         nop()
         nop()
         nop()
 
-    nop(sig = thrsw)
-    nop(sig = thrsw)
+    nop(sig=thrsw)
+    nop(sig=thrsw)
     nop()
     nop()
-    nop(sig = thrsw)
+    nop(sig=thrsw)
     nop()
     nop()
     nop()
 
 
-def test_tmu_vec_write():
-
+def test_tmu_vec_write() -> None:
     n = 123
 
     # The number of 32-bit values in a vector element per pixel is 1, 2, 3, or 4.
@@ -159,24 +146,23 @@ def test_tmu_vec_write():
     #     addr + 0xc0: r3[12], r0[12], r1[12], r2[12], r3[13], r0[13], ..., r2[15]
     vec_offset = 3
 
-    data_default = 0xdeadbeef
+    data_default = 0xDEADBEEF
 
     with Driver() as drv:
-
         code = drv.program(qpu_tmu_vec_write, configs, vec_offset)
-        data = drv.alloc(16 * 4 * len(configs) * n, dtype='uint32')
-        unif = drv.alloc(2 + n, dtype='uint32')
+        data: Array[np.uint32] = drv.alloc(16 * 4 * len(configs) * n, dtype=np.uint32)
+        unif: Array[np.uint32] = drv.alloc(2 + n, dtype=np.uint32)
 
         data[:] = data_default
 
         unif[0] = data.addresses()[0]
         unif[1] = n
 
-        conf = 0xffffffff
+        conf = 0xFFFFFFFF
         for config in reversed(configs):
             conf <<= 8
-            conf |= {1: 0xff, 2: 0xfa, 3: 0xfb, 4: 0xfc}[config]
-        conf &= 0xffffffff
+            conf |= {1: 0xFF, 2: 0xFA, 3: 0xFB, 4: 0xFC}[config]
+        conf &= 0xFFFFFFFF
         unif[2:] = conf
 
         drv.execute(code, unif.addresses()[0])
@@ -189,51 +175,47 @@ def test_tmu_vec_write():
 
 
 @qpu
-def qpu_tmu_read(asm):
-
+def qpu_tmu_read(asm: Assembly) -> None:
     # r0: Number of vectors to read.
     # r1: Pointer to the read vectors + eidx * 4.
     # r2: Pointer to the write vectors + eidx * 4
-    eidx(r2, sig = ldunif)
-    mov(r0, r5, sig = ldunif)
+    eidx(r2, sig=ldunif)
+    mov(r0, r5, sig=ldunif)
     shl(r2, r2, 2).mov(r1, r5)
-    add(r1, r1, r2, sig = ldunif)
+    add(r1, r1, r2, sig=ldunif)
     add(r2, r5, r2)
 
-    with loop as l:
-
-        mov(tmua, r1, sig = thrsw)
+    with loop as l:  # noqa: E741
+        mov(tmua, r1, sig=thrsw)
         nop()
         nop()
-        nop(sig = ldtmu(rf0))
+        nop(sig=ldtmu(rf0))
 
-        sub(r0, r0, 1, cond = 'pushz').add(tmud, rf0, 1)
-        l.b(cond = 'anyna')
+        sub(r0, r0, 1, cond="pushz").add(tmud, rf0, 1)
+        l.b(cond="anyna")
         shl(r3, 4, 4).mov(tmua, r2)
         # r1 += 64
         # r2 += 64
         add(r1, r1, r3).add(r2, r2, r3)
         tmuwt()
 
-    nop(sig = thrsw)
-    nop(sig = thrsw)
+    nop(sig=thrsw)
+    nop(sig=thrsw)
     nop()
     nop()
-    nop(sig = thrsw)
+    nop(sig=thrsw)
     nop()
     nop()
     nop()
 
 
-def test_tmu_read():
-
+def test_tmu_read() -> None:
     n = 4096
 
     with Driver() as drv:
-
         code = drv.program(qpu_tmu_read)
-        data = drv.alloc(n * 16, dtype = 'uint32')
-        unif = drv.alloc(3, dtype = 'uint32')
+        data: Array[np.uint32] = drv.alloc(n * 16, dtype=np.uint32)
+        unif: Array[np.uint32] = drv.alloc(3, dtype=np.uint32)
 
         data[:] = range(len(data))
         unif[0] = n
@@ -246,8 +228,7 @@ def test_tmu_read():
 
 
 @qpu
-def qpu_tmu_vec_read(asm, configs, vec_offset):
-
+def qpu_tmu_vec_read(asm: Assembly, configs: list[int], vec_offset: int) -> None:
     reg_src = rf0
     reg_dst = rf1
     reg_n = rf2
@@ -261,13 +242,11 @@ def qpu_tmu_vec_read(asm, configs, vec_offset):
     shl(r0, r0, 2)
     add(reg_dst, reg_dst, r0)
 
-    with loop as l:
-
+    with loop as l:  # noqa: E741
         mov(r4, 0)
 
         assert 1 <= len(configs) <= 4
         for i, config in enumerate(configs):
-
             assert 1 <= config <= 4
             assert 0 <= vec_offset <= 3
             # addr + 4 * 4 * eidx + 4 * vec_offset
@@ -299,24 +278,23 @@ def qpu_tmu_vec_read(asm, configs, vec_offset):
         shl(r0, 4, 4)
         add(reg_dst, reg_dst, r0)
 
-        sub(reg_n, reg_n, 1, cond='pushz')
-        l.b(cond='na0')
+        sub(reg_n, reg_n, 1, cond="pushz")
+        l.b(cond="na0")
         nop()
         nop()
         nop()
 
-    nop(sig = thrsw)
-    nop(sig = thrsw)
+    nop(sig=thrsw)
+    nop(sig=thrsw)
     nop()
     nop()
-    nop(sig = thrsw)
+    nop(sig=thrsw)
     nop()
     nop()
     nop()
 
 
-def test_tmu_vec_read():
-
+def test_tmu_vec_read() -> None:
     # The settings, the number of elements in a vector, and 16-byte wrapping are
     # the same as the vector writes.
 
@@ -325,11 +303,10 @@ def test_tmu_vec_read():
     vec_offset = 1
 
     with Driver() as drv:
-
         code = drv.program(qpu_tmu_vec_read, configs, vec_offset)
-        src = drv.alloc((n, 16 * 4 * len(configs)), dtype='uint32')
-        dst = drv.alloc((n, 16), dtype='uint32')
-        unif = drv.alloc(3 + n, dtype='uint32')
+        src: Array[np.uint32] = drv.alloc((n, 16 * 4 * len(configs)), dtype=np.uint32)
+        dst: Array[np.uint32] = drv.alloc((n, 16), dtype=np.uint32)
+        unif: Array[np.uint32] = drv.alloc(3 + n, dtype=np.uint32)
 
         src[:, :] = np.arange(src.size, dtype=src.dtype).reshape(src.shape)
         dst[:, :] = 0
@@ -338,17 +315,17 @@ def test_tmu_vec_read():
         unif[1] = dst.addresses()[0, 0]
         unif[2] = n
 
-        conf = 0xffffffff
+        conf = 0xFFFFFFFF
         for config in reversed(configs):
             conf <<= 8
-            conf |= {1: 0xff, 2: 0xfa, 3: 0xfb, 4: 0xfc}[config]
-        conf &= 0xffffffff
+            conf |= {1: 0xFF, 2: 0xFA, 3: 0xFB, 4: 0xFC}[config]
+        conf &= 0xFFFFFFFF
         unif[3:] = conf
 
         drv.execute(code, unif.addresses()[0])
 
         for i, vec in enumerate(dst):
-            data = src.shape[1] * i + np.arange(src.shape[1], dtype='uint32').reshape(len(configs), 16, 4)
+            data = src.shape[1] * i + np.arange(src.shape[1], dtype=np.uint32).reshape(len(configs), 16, 4)
             s = [0] * 16
             for j, config in enumerate(configs):
                 for eidx in range(16):
@@ -361,44 +338,42 @@ def test_tmu_vec_read():
 # VC4 TMU cache & DMA break memory consistency.
 # How about VC6 TMU ?
 @qpu
-def qpu_tmu_keeps_memory_consistency(asm):
+def qpu_tmu_keeps_memory_consistency(asm: Assembly) -> None:
+    nop(sig=ldunifrf(r0))
 
-    nop(sig = ldunifrf(r0))
-
-    mov(tmua, r0, sig = thrsw)
+    mov(tmua, r0, sig=thrsw)
     nop()
     nop()
-    nop(sig = ldtmu(r1))
-
-    add(tmud, r1, 1)
-    mov(tmua, r0)
-    tmuwt()
-
-    mov(tmua, r0, sig = thrsw)
-    nop()
-    nop()
-    nop(sig = ldtmu(r1))
+    nop(sig=ldtmu(r1))
 
     add(tmud, r1, 1)
     mov(tmua, r0)
     tmuwt()
 
-    nop(sig = thrsw)
-    nop(sig = thrsw)
+    mov(tmua, r0, sig=thrsw)
     nop()
     nop()
-    nop(sig = thrsw)
+    nop(sig=ldtmu(r1))
+
+    add(tmud, r1, 1)
+    mov(tmua, r0)
+    tmuwt()
+
+    nop(sig=thrsw)
+    nop(sig=thrsw)
+    nop()
+    nop()
+    nop(sig=thrsw)
     nop()
     nop()
     nop()
 
-def test_tmu_keeps_memory_consistency():
 
+def test_tmu_keeps_memory_consistency() -> None:
     with Driver() as drv:
-
         code = drv.program(qpu_tmu_keeps_memory_consistency)
-        data = drv.alloc(16, dtype = 'uint32')
-        unif = drv.alloc(3, dtype = 'uint32')
+        data: Array[np.uint32] = drv.alloc(16, dtype=np.uint32)
+        unif: Array[np.uint32] = drv.alloc(3, dtype=np.uint32)
 
         data[:] = 1
         unif[0] = data.addresses()[0]
@@ -410,51 +385,49 @@ def test_tmu_keeps_memory_consistency():
 
 
 @qpu
-def qpu_tmu_read_tmu_write_uniform_read(asm):
-
-    eidx(r0, sig = ldunifrf(rf0))
+def qpu_tmu_read_tmu_write_uniform_read(asm: Assembly) -> None:
+    eidx(r0, sig=ldunifrf(rf0))
     shl(r0, r0, 2)
-    add(rf0, rf0, r0, sig = ldunifrf(rf1))
+    add(rf0, rf0, r0, sig=ldunifrf(rf1))
     add(rf1, rf1, r0)
 
-    mov(tmua, rf0, sig = thrsw)
+    mov(tmua, rf0, sig=thrsw)
     nop()
     nop()
-    nop(sig = ldtmu(r0)) # r0 = [1,...,1]
+    nop(sig=ldtmu(r0))  # r0 = [1,...,1]
 
     add(tmud, r0, 1)
-    mov(tmua, rf0)       # data = [2,...,2]
+    mov(tmua, rf0)  # data = [2,...,2]
     tmuwt()
 
-    b(R.set_unif_addr, cond = 'always').unif_addr(rf0) # unif_addr = data.addresses()[0]
+    b(R.set_unif_addr, cond="always").unif_addr(rf0)  # unif_addr = data.addresses()[0]
     nop()
     nop()
     nop()
     L.set_unif_addr
 
-    nop(sig = ldunifrf(r0)) # r0 = [data[0],...,data[0]] = [2,...,2]
+    nop(sig=ldunifrf(r0))  # r0 = [data[0],...,data[0]] = [2,...,2]
 
     add(tmud, r0, 1)
-    mov(tmua, rf1)          # result = [3,...,3]
+    mov(tmua, rf1)  # result = [3,...,3]
     tmuwt()
 
-    nop(sig = thrsw)
-    nop(sig = thrsw)
+    nop(sig=thrsw)
+    nop(sig=thrsw)
     nop()
     nop()
-    nop(sig = thrsw)
+    nop(sig=thrsw)
     nop()
     nop()
     nop()
 
-def test_tmu_read_tmu_write_uniform_read():
 
+def test_tmu_read_tmu_write_uniform_read() -> None:
     with Driver() as drv:
-
         code = drv.program(qpu_tmu_read_tmu_write_uniform_read)
-        data = drv.alloc(16, dtype = 'uint32')
-        result = drv.alloc(16, dtype = 'uint32')
-        unif = drv.alloc(3, dtype = 'uint32')
+        data: Array[np.uint32] = drv.alloc(16, dtype=np.uint32)
+        result: Array[np.uint32] = drv.alloc(16, dtype=np.uint32)
+        unif: Array[np.uint32] = drv.alloc(3, dtype=np.uint32)
 
         data[:] = 1
         unif[0] = data.addresses()[0]
@@ -463,4 +436,4 @@ def test_tmu_read_tmu_write_uniform_read():
         drv.execute(code, unif.addresses()[0])
 
         assert (data == 2).all()
-        assert (result == 2).all() # !? not 3 ?
+        assert (result == 2).all()  # !? not 3 ?

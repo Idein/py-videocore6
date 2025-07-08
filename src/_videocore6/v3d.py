@@ -1,4 +1,3 @@
-
 # Copyright (c) 2014-2018 Broadcom
 # Copyright (c) 2019-2020 Idein Inc.
 #
@@ -15,35 +14,37 @@
 # You should have received a copy of the GNU General Public License along with
 # this program; if not, write to the Free Software Foundation, Inc., 51 Franklin
 # Street, Fifth Floor, Boston, MA 02110-1301 USA.
-
-
-from ctypes import cdll, c_uint32, c_void_p
-from importlib.machinery import EXTENSION_SUFFIXES
-from pathlib import Path
 import mmap
 import os
+from ctypes import c_uint32, c_void_p, cdll
+from importlib.machinery import EXTENSION_SUFFIXES
+from pathlib import Path
+from types import TracebackType
+from typing import Self, cast
 
 import numpy as np
 
 
 class HubRegister:
+    offset: int
 
-    def __init__(self, offset):
-
+    def __init__(self: Self, offset: int) -> None:
         self.offset = offset
 
 
 class PerCoreRegister:
+    offset: int
 
-    def __init__(self, offset):
-
+    def __init__(self: Self, offset: int) -> None:
         self.offset = offset
 
 
 class HubField:
+    register: HubRegister
+    mask: int
+    shift: int
 
-    def __init__(self, register, high, low):
-
+    def __init__(self: Self, register: HubRegister, high: int, low: int) -> None:
         assert isinstance(register, HubRegister)
         self.register = register
         self.mask = ((1 << (high - low + 1)) - 1) << low
@@ -51,9 +52,11 @@ class HubField:
 
 
 class PerCoreField:
+    register: PerCoreRegister
+    mask: int
+    shift: int
 
-    def __init__(self, register, high, low):
-
+    def __init__(self: Self, register: PerCoreRegister, high: int, low: int) -> None:
         assert isinstance(register, PerCoreRegister)
         self.register = register
         self.mask = ((1 << (high - low + 1)) - 1) << low
@@ -68,7 +71,7 @@ HUB_UIFCFG = HubRegister(0x00004)
 
 HUB_IDENT0 = HubRegister(0x00008)
 
-HUB_IDENT1 = HubRegister(0x0000c)
+HUB_IDENT1 = HubRegister(0x0000C)
 HUB_IDENT1_WITH_MSO = HubField(HUB_IDENT1, 19, 19)
 HUB_IDENT1_WITH_TSY = HubField(HUB_IDENT1, 18, 18)
 HUB_IDENT1_WITH_TFU = HubField(HUB_IDENT1, 17, 17)
@@ -94,7 +97,11 @@ CORE_IDENT0_VER = PerCoreField(CORE_IDENT0, 31, 24)
 
 CORE_IDENT1 = PerCoreRegister(0x00004)
 CORE_IDENT1_VPM_SIZE = PerCoreField(CORE_IDENT1, 31, 28)
-CORE_IDENT1_NSEM = PerCoreField(CORE_IDENT1, 23, 16, )
+CORE_IDENT1_NSEM = PerCoreField(
+    CORE_IDENT1,
+    23,
+    16,
+)
 CORE_IDENT1_NTMU = PerCoreField(CORE_IDENT1, 15, 12)
 CORE_IDENT1_QUPS = PerCoreField(CORE_IDENT1, 11, 8)
 CORE_IDENT1_NSLC = PerCoreField(CORE_IDENT1, 7, 4)
@@ -125,19 +132,19 @@ CORE_PCTR_0_OVERFLOW = PerCoreRegister(0x00658)
 g = globals()
 
 for i in range(0, 32, 4):
-    name = f'CORE_PCTR_0_SRC_{i}_{i+3}'
+    name = f"CORE_PCTR_0_SRC_{i}_{i + 3}"
     g[name] = PerCoreRegister(0x00660 + i)
-    g[name + f'_S{i+3}'] = PerCoreField(g[name], 30, 24)
-    g[name + f'_S{i+2}'] = PerCoreField(g[name], 22, 16)
-    g[name + f'_S{i+1}'] = PerCoreField(g[name], 14, 8)
-    g[name + f'_S{i+0}'] = PerCoreField(g[name], 6, 0)
-    g[f'CORE_PCTR_0_SRC_{i+3}'] = PerCoreField(g[name], 30, 24)
-    g[f'CORE_PCTR_0_SRC_{i+2}'] = PerCoreField(g[name], 22, 16)
-    g[f'CORE_PCTR_0_SRC_{i+1}'] = PerCoreField(g[name], 14, 8)
-    g[f'CORE_PCTR_0_SRC_{i+0}'] = PerCoreField(g[name], 6, 0)
+    g[name + f"_S{i + 3}"] = PerCoreField(g[name], 30, 24)
+    g[name + f"_S{i + 2}"] = PerCoreField(g[name], 22, 16)
+    g[name + f"_S{i + 1}"] = PerCoreField(g[name], 14, 8)
+    g[name + f"_S{i + 0}"] = PerCoreField(g[name], 6, 0)
+    g[f"CORE_PCTR_0_SRC_{i + 3}"] = PerCoreField(g[name], 30, 24)
+    g[f"CORE_PCTR_0_SRC_{i + 2}"] = PerCoreField(g[name], 22, 16)
+    g[f"CORE_PCTR_0_SRC_{i + 1}"] = PerCoreField(g[name], 14, 8)
+    g[f"CORE_PCTR_0_SRC_{i + 0}"] = PerCoreField(g[name], 6, 0)
 
 for i in range(32):
-    g[f'CORE_PCTR_0_PCTR{i}'] = PerCoreRegister(0x00680 + 4 * i)
+    g[f"CORE_PCTR_0_PCTR{i}"] = PerCoreRegister(0x00680 + 4 * i)
 
 del g, i
 
@@ -145,20 +152,17 @@ CORE_PCTR_CYCLE_COUNT = 32
 
 
 class RegisterMapping:
-
-    def __init__(self):
-
-        stem = Path(__file__).parent / 'readwrite4'
+    def __init__(self: Self) -> None:
+        stem = Path(__file__).parent / "readwrite4"
         for suffix in EXTENSION_SUFFIXES:
             try:
-                lib = cdll.LoadLibrary(stem.with_suffix(suffix))
+                lib = cdll.LoadLibrary(str(stem.with_suffix(suffix)))
             except OSError:
                 continue
             else:
                 break
         else:
-            raise Exception('readwrite4 library is not found.'
-                            + ' Your installation seems to be broken.')
+            raise Exception("readwrite4 library is not found." + " Your installation seems to be broken.")
 
         self.read4 = lib.read4
         self.write4 = lib.write4
@@ -169,89 +173,106 @@ class RegisterMapping:
         self.write4.argtypes = [c_void_p, c_uint32]
         self.write4.restype = None
 
-        fd = os.open('/dev/mem', os.O_RDWR)
+        fd = os.open("/dev/mem", os.O_RDWR)
 
         # XXX: Should use bcm_host_get_peripheral_address for the base address
         # on userland, and consult /proc/device-tree/__symbols__/v3d and then
         # /proc/device-tree/v3dbus/v3d@7ec04000/{reg-names,reg} for the offsets
         # in the future.
 
-        self.map_hub = mmap.mmap(offset=0xfec00000, length=0x4000, fileno=fd,
-                                 flags=mmap.MAP_SHARED,
-                                 prot=mmap.PROT_READ | mmap.PROT_WRITE)
+        self.map_hub = mmap.mmap(
+            offset=0xFEC00000, length=0x4000, fileno=fd, flags=mmap.MAP_SHARED, prot=mmap.PROT_READ | mmap.PROT_WRITE
+        )
         self.ptr_hub = np.frombuffer(self.map_hub).ctypes.data
 
         self.ncores = 1
-        self.map_cores = [None] * self.ncores
-        self.ptr_cores = [None] * self.ncores
+        self.map_cores: list[mmap.mmap] = []
+        self.ptr_cores: list[int] = []
         for core in range(self.ncores):
-            self.map_cores[core] = mmap.mmap(offset=0xfec04000 + 0x4000 * core,
-                                             length=0x4000, fileno=fd,
-                                             flags=mmap.MAP_SHARED,
-                                             prot=mmap.PROT_READ | mmap.PROT_WRITE)
-            self.ptr_cores[core] = \
-                np.frombuffer(self.map_cores[core]).ctypes.data
+            m = mmap.mmap(
+                offset=0xFEC04000 + 0x4000 * core,
+                length=0x4000,
+                fileno=fd,
+                flags=mmap.MAP_SHARED,
+                prot=mmap.PROT_READ | mmap.PROT_WRITE,
+            )
+            self.map_cores.append(m)
+            self.ptr_cores.append(np.frombuffer(m).ctypes.data)
 
         os.close(fd)
 
-    def __enter__(self):
-
+    def __enter__(self: Self) -> Self:
         return self
 
-    def __exit__(self, type, value, traceback):
-
+    def __exit__(
+        self: Self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: type[TracebackType] | None,
+    ) -> None:
         pass
 
-    def _get_ptr(self, key, core):
-
-        if isinstance(key, (HubField, PerCoreField)):
+    def _get_ptr(self: Self, key: HubField | PerCoreField | HubRegister | PerCoreRegister, core: int | None) -> int:
+        if isinstance(key, HubField | PerCoreField):
             return self._get_ptr(key.register, core)
         elif isinstance(key, HubRegister):
             assert core is None
             return self.ptr_hub + key.offset
         elif isinstance(key, PerCoreRegister):
+            assert core is not None
             return self.ptr_cores[core] + key.offset
 
-    def __getitem__(self, key):
-
+    def __getitem__(
+        self: Self,
+        key: tuple[HubField | PerCoreField | HubRegister | PerCoreRegister, int | None]
+        | HubField
+        | PerCoreField
+        | HubRegister
+        | PerCoreRegister,
+    ) -> int:
         core = None
         if isinstance(key, tuple):
             key, core = key
+        assert isinstance(key, HubField | PerCoreField | HubRegister | PerCoreRegister)
 
-        v = self.read4(self._get_ptr(key, core))
+        v = cast(int, self.read4(self._get_ptr(key, core)))
 
-        if isinstance(key, (HubField, PerCoreField)):
+        if isinstance(key, HubField | PerCoreField):
             v = (v & key.mask) >> key.shift
 
         return v
 
-    def __setitem__(self, key, value):
-
+    def __setitem__(
+        self: Self,
+        key: tuple[HubField | PerCoreField | HubRegister | PerCoreRegister, int | None]
+        | HubField
+        | PerCoreField
+        | HubRegister
+        | PerCoreRegister,
+        value: int,
+    ) -> None:
         core = None
         if isinstance(key, tuple):
             key, core = key
+        assert isinstance(key, HubField | PerCoreField | HubRegister | PerCoreRegister)
 
-        if isinstance(key, (HubField, PerCoreField)):
-            value = (self[key.register, core] & ~key.mask) \
-                | ((value << key.shift) & key.mask)
+        if isinstance(key, HubField | PerCoreField):
+            value = (self[key.register, core] & ~key.mask) | ((value << key.shift) & key.mask)
 
         self.write4(self._get_ptr(key, core), value)
 
 
 class PerformanceCounter:
+    _PCTR_SRCs = [globals()[f"CORE_PCTR_0_SRC_{_}"] for _ in range(32)]
+    _PCTRs = [globals()[f"CORE_PCTR_0_PCTR{_}"] for _ in range(32)]
 
-    _PCTR_SRCs = [globals()[f'CORE_PCTR_0_SRC_{_}'] for _ in range(32)]
-    _PCTRs = [globals()[f'CORE_PCTR_0_PCTR{_}'] for _ in range(32)]
-
-    def __init__(self, regmap, srcs):
-
+    def __init__(self: Self, regmap: RegisterMapping, srcs: list[int]) -> None:
         self.regmap = regmap
         self.srcs = srcs
         self.core = 0  # Sufficient for now.
         self.mask = (1 << len(self.srcs)) - 1
 
-    def __enter__(self):
-
+    def __enter__(self: Self) -> Self:
         self.regmap[CORE_PCTR_0_EN, self.core] = 0
 
         for i in range(len(self.srcs)):
@@ -263,13 +284,15 @@ class PerformanceCounter:
 
         return self
 
-    def __exit__(self, type, value, traceback):
-
+    def __exit__(
+        self: Self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: type[TracebackType] | None,
+    ) -> None:
         self.regmap[CORE_PCTR_0_EN, self.core] = 0
         self.regmap[CORE_PCTR_0_CLR, self.core] = self.mask
         self.regmap[CORE_PCTR_0_OVERFLOW, self.core] = self.mask
 
-    def result(self):
-
-        return [self.regmap[self._PCTRs[i], self.core]
-                for i in range(len(self.srcs))]
+    def result(self: Self) -> list[int]:
+        return [self.regmap[self._PCTRs[i], self.core] for i in range(len(self.srcs))]
