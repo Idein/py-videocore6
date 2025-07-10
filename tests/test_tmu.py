@@ -437,3 +437,442 @@ def test_tmu_read_tmu_write_uniform_read() -> None:
 
         assert (data == 2).all()
         assert (result == 2).all()  # !? not 3 ?
+
+
+@qpu
+def qpu_tmu_vec_n_naive_write(asm: Assembly, vec_n: int) -> None:
+    assert 2 <= vec_n <= 4
+
+    eidx(rf1, cond="pushz")
+    nop(sig=ldunifrf(rf2))
+    mov(rf10, rf2, cond="ifa")
+    for i in range(15):
+        nop(sig=ldunifrf(rf2))
+        sub(rf1, rf1, 1, cond="pushz")
+        mov(rf10, rf2, cond="ifa")
+
+    mov(rf1, 8)
+    add(rf1, rf1, 8)
+    eidx(rf20)
+    add(rf20, rf20, 1)
+    add(rf21, rf20, rf1)
+    add(rf22, rf21, rf1)
+    add(rf23, rf22, rf1)
+
+    bnot(tmuc, 7 - vec_n)  # vec n write
+    for i in range(vec_n):
+        mov(tmud, rf[20 + i])
+    mov(tmua, rf10)
+
+    tmuwt()
+
+    nop(sig=thrsw)
+    nop(sig=thrsw)
+    nop()
+    nop()
+    nop(sig=thrsw)
+    nop()
+    nop()
+    nop()
+
+
+def test_tmu_vec4_naive_write() -> None:
+    # result[:] <- 0 (result.addresses()[0, 0] must be aligned to 64 bytes)
+    #
+    # tmuc <- vec4 write
+    #
+    # tmud[0] <- [ 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16]
+    # tmud[1] <- [17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32]
+    # tmud[2] <- [33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48]
+    # tmud[3] <- [49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64]
+    #
+    # tmua <- result.addresses()[i, i]
+    #
+    # result =
+    # [[ 1 17 33 49  0  0  0  0  0  0  0  0  0  0  0  0]
+    #  [50  2 18 34  0  0  0  0  0  0  0  0  0  0  0  0]
+    #  [35 51  3 19  0  0  0  0  0  0  0  0  0  0  0  0]
+    #  [20 36 52  4  0  0  0  0  0  0  0  0  0  0  0  0]
+    #  [ 0  0  0  0  5 21 37 53  0  0  0  0  0  0  0  0]
+    #  [ 0  0  0  0 54  6 22 38  0  0  0  0  0  0  0  0]
+    #  [ 0  0  0  0 39 55  7 23  0  0  0  0  0  0  0  0]
+    #  [ 0  0  0  0 24 40 56  8  0  0  0  0  0  0  0  0]
+    #  [ 0  0  0  0  0  0  0  0  9 25 41 57  0  0  0  0]
+    #  [ 0  0  0  0  0  0  0  0 58 10 26 42  0  0  0  0]
+    #  [ 0  0  0  0  0  0  0  0 43 59 11 27  0  0  0  0]
+    #  [ 0  0  0  0  0  0  0  0 28 44 60 12  0  0  0  0]
+    #  [ 0  0  0  0  0  0  0  0  0  0  0  0 13 29 45 61]
+    #  [ 0  0  0  0  0  0  0  0  0  0  0  0 62 14 30 46]
+    #  [ 0  0  0  0  0  0  0  0  0  0  0  0 47 63 15 31]
+    #  [ 0  0  0  0  0  0  0  0  0  0  0  0 32 48 64 16]]
+    #
+    vec = 4
+    with Driver() as drv:
+        code = drv.program(qpu_tmu_vec_n_naive_write, vec)
+        result: Array[np.uint32] = drv.alloc((16, 16), dtype=np.uint32)
+        unif: Array[np.uint32] = drv.alloc(16, dtype=np.uint32)
+
+        assert result.addresses().item(0) % 64 == 0
+
+        result[:] = 0
+
+        for i in range(16):
+            unif[i] = result.addresses()[i, i]
+
+        drv.execute(code, unif.addresses()[0])
+
+        tmud = np.arange(1, 16 * vec + 1, dtype=np.uint32).reshape(vec, 16)
+        expected = np.zeros((16, 16), dtype=np.uint32)
+        for i in range(4):
+            expected.reshape(4, 4, 4, 4)[i, :, i, :] = np.vectorize(np.roll, signature="(n),()->(n)")(
+                np.pad(tmud, [(0, 4 - vec), (0, 0)]).reshape(4, 4, 4)[:, i, :].T, np.arange(4)
+            )
+
+        # print()
+        # print(result)
+        # print(expected)
+
+        assert (result == expected).all()
+
+
+def test_tmu_vec3_naive_write() -> None:
+    # result[:] <- 0 (result.addresses()[0, 0] must be aligned to 64 bytes)
+    #
+    # tmuc <- vec3 write
+    #
+    # tmud[0] <- [ 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16]
+    # tmud[1] <- [17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32]
+    # tmud[2] <- [33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48]
+    #
+    # tmua <- result.addresses()[i, i]
+    #
+    # result =
+    # [[ 1 17 33  0  0  0  0  0  0  0  0  0  0  0  0  0]
+    #  [ 0  2 18 34  0  0  0  0  0  0  0  0  0  0  0  0]
+    #  [35  0  3 19  0  0  0  0  0  0  0  0  0  0  0  0]
+    #  [20 36  0  4  0  0  0  0  0  0  0  0  0  0  0  0]
+    #  [ 0  0  0  0  5 21 37  0  0  0  0  0  0  0  0  0]
+    #  [ 0  0  0  0  0  6 22 38  0  0  0  0  0  0  0  0]
+    #  [ 0  0  0  0 39  0  7 23  0  0  0  0  0  0  0  0]
+    #  [ 0  0  0  0 24 40  0  8  0  0  0  0  0  0  0  0]
+    #  [ 0  0  0  0  0  0  0  0  9 25 41  0  0  0  0  0]
+    #  [ 0  0  0  0  0  0  0  0  0 10 26 42  0  0  0  0]
+    #  [ 0  0  0  0  0  0  0  0 43  0 11 27  0  0  0  0]
+    #  [ 0  0  0  0  0  0  0  0 28 44  0 12  0  0  0  0]
+    #  [ 0  0  0  0  0  0  0  0  0  0  0  0 13 29 45  0]
+    #  [ 0  0  0  0  0  0  0  0  0  0  0  0  0 14 30 46]
+    #  [ 0  0  0  0  0  0  0  0  0  0  0  0 47  0 15 31]
+    #  [ 0  0  0  0  0  0  0  0  0  0  0  0 32 48  0 16]]
+    #
+    vec = 3
+    with Driver() as drv:
+        code = drv.program(qpu_tmu_vec_n_naive_write, vec)
+        result: Array[np.uint32] = drv.alloc((16, 16), dtype=np.uint32)
+        unif: Array[np.uint32] = drv.alloc(16, dtype=np.uint32)
+
+        assert result.addresses().item(0) % 64 == 0
+
+        result[:] = 0
+
+        for i in range(16):
+            unif[i] = result.addresses()[i, i]
+
+        drv.execute(code, unif.addresses()[0])
+
+        tmud = np.arange(1, 16 * vec + 1, dtype=np.uint32).reshape(vec, 16)
+        expected = np.zeros((16, 16), dtype=np.uint32)
+        for i in range(4):
+            expected.reshape(4, 4, 4, 4)[i, :, i, :] = np.vectorize(np.roll, signature="(n),()->(n)")(
+                np.pad(tmud, [(0, 4 - vec), (0, 0)]).reshape(4, 4, 4)[:, i, :].T, np.arange(4)
+            )
+
+        # print()
+        # print(result)
+        # print(expected)
+
+        assert (result == expected).all()
+
+
+def test_tmu_vec2_naive_write() -> None:
+    # result[:] <- 0 (result.addresses()[0, 0] must be aligned to 64 bytes)
+    #
+    # tmuc <- vec2 write
+    #
+    # tmud[0] <- [ 1  2  3  4  5  6  7  8  9 10 11 12 13 14 15 16]
+    # tmud[1] <- [17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32]
+    #
+    # tmua <- result.addresses()[i, i]
+    #
+    # result =
+    # [[ 1 17  0  0  0  0  0  0  0  0  0  0  0  0  0  0]
+    #  [ 0  2 18  0  0  0  0  0  0  0  0  0  0  0  0  0]
+    #  [ 0  0  3 19  0  0  0  0  0  0  0  0  0  0  0  0]
+    #  [20  0  0  4  0  0  0  0  0  0  0  0  0  0  0  0]
+    #  [ 0  0  0  0  5 21  0  0  0  0  0  0  0  0  0  0]
+    #  [ 0  0  0  0  0  6 22  0  0  0  0  0  0  0  0  0]
+    #  [ 0  0  0  0  0  0  7 23  0  0  0  0  0  0  0  0]
+    #  [ 0  0  0  0 24  0  0  8  0  0  0  0  0  0  0  0]
+    #  [ 0  0  0  0  0  0  0  0  9 25  0  0  0  0  0  0]
+    #  [ 0  0  0  0  0  0  0  0  0 10 26  0  0  0  0  0]
+    #  [ 0  0  0  0  0  0  0  0  0  0 11 27  0  0  0  0]
+    #  [ 0  0  0  0  0  0  0  0 28  0  0 12  0  0  0  0]
+    #  [ 0  0  0  0  0  0  0  0  0  0  0  0 13 29  0  0]
+    #  [ 0  0  0  0  0  0  0  0  0  0  0  0  0 14 30  0]
+    #  [ 0  0  0  0  0  0  0  0  0  0  0  0  0  0 15 31]
+    #  [ 0  0  0  0  0  0  0  0  0  0  0  0 32  0  0 16]]
+    #
+    vec = 2
+    with Driver() as drv:
+        code = drv.program(qpu_tmu_vec_n_naive_write, vec)
+        result: Array[np.uint32] = drv.alloc((16, 16), dtype=np.uint32)
+        unif: Array[np.uint32] = drv.alloc(16, dtype=np.uint32)
+
+        assert result.addresses().item(0) % 64 == 0
+
+        result[:] = 0
+
+        for i in range(16):
+            unif[i] = result.addresses()[i, i]
+
+        drv.execute(code, unif.addresses()[0])
+
+        tmud = np.arange(1, 16 * vec + 1, dtype=np.uint32).reshape(vec, 16)
+        expected = np.zeros((16, 16), dtype=np.uint32)
+        for i in range(4):
+            expected.reshape(4, 4, 4, 4)[i, :, i, :] = np.vectorize(np.roll, signature="(n),()->(n)")(
+                np.pad(tmud, [(0, 4 - vec), (0, 0)]).reshape(4, 4, 4)[:, i, :].T, np.arange(4)
+            )
+
+        # print()
+        # print(result)
+        # print(expected)
+
+        assert (result == expected).all()
+
+
+@qpu
+def qpu_tmu_vec_n_naive_read(asm: Assembly, vec_n: int) -> None:
+    assert 2 <= vec_n <= 4
+
+    eidx(rf1, cond="pushz")
+    nop(sig=ldunifrf(rf2))
+    mov(rf10, rf2, cond="ifa")
+    for i in range(15):
+        nop(sig=ldunifrf(rf2))
+        sub(rf1, rf1, 1, cond="pushz")
+        mov(rf10, rf2, cond="ifa")
+
+    bnot(tmuc, 7 - vec_n)  # vec n read
+    mov(tmua, rf10, sig=thrsw)
+    nop()
+    nop()
+    for i in range(vec_n):
+        nop(sig=ldtmu(rf[20 + i]))
+
+    eidx(rf1, sig=ldunifrf(rf10))
+    shl(rf1, rf1, 2)
+    add(rf10, rf10, rf1)
+    shl(rf2, 4, 4)
+    for i in range(vec_n):
+        mov(tmud, rf[20 + i])
+        mov(tmua, rf10).add(rf10, rf10, rf2)
+
+    tmuwt()
+
+    nop(sig=thrsw)
+    nop(sig=thrsw)
+    nop()
+    nop()
+    nop(sig=thrsw)
+    nop()
+    nop()
+    nop()
+
+
+def test_tmu_vec4_naive_read() -> None:
+    # result[:] <- 0 (result.addresses()[0, 0] must be aligned to 64 bytes)
+    #
+    # data =
+    # [[  1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16]
+    #  [ 17  18  19  20  21  22  23  24  25  26  27  28  29  30  31  32]
+    #  [ 33  34  35  36  37  38  39  40  41  42  43  44  45  46  47  48]
+    #  [ 49  50  51  52  53  54  55  56  57  58  59  60  61  62  63  64]
+    #  [ 65  66  67  68  69  70  71  72  73  74  75  76  77  78  79  80]
+    #  [ 81  82  83  84  85  86  87  88  89  90  91  92  93  94  95  96]
+    #  [ 97  98  99 100 101 102 103 104 105 106 107 108 109 110 111 112]
+    #  [113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128]
+    #  [129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144]
+    #  [145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160]
+    #  [161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176]
+    #  [177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192]
+    #  [193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208]
+    #  [209 210 211 212 213 214 215 216 217 218 219 220 221 222 223 224]
+    #  [225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 240]
+    #  [241 242 243 244 245 246 247 248 249 250 251 252 253 254 255 256]]
+    #
+    # tmuc <- vec4 read
+    # tmua <- data.addresses()[i, i]
+    #
+    # result[i] <- tmu[i]
+    #
+    # result =
+    # [[  1  18  35  52  69  86 103 120 137 154 171 188 205 222 239 256]
+    #  [  2  19  36  49  70  87 104 117 138 155 172 185 206 223 240 253]
+    #  [  3  20  33  50  71  88 101 118 139 156 169 186 207 224 237 254]
+    #  [  4  17  34  51  72  85 102 119 140 153 170 187 208 221 238 255]]
+    #
+    vec = 4
+    with Driver() as drv:
+        code = drv.program(qpu_tmu_vec_n_naive_read, vec)
+        data: Array[np.uint32] = drv.alloc((16, 16), dtype=np.uint32)
+        result: Array[np.uint32] = drv.alloc((vec, 16), dtype=np.uint32)
+        unif: Array[np.uint32] = drv.alloc(16 + 1, dtype=np.uint32)
+
+        assert result.addresses().item(0) % 64 == 0
+
+        data[:] = np.arange(1, 16 * 16 + 1, dtype=np.uint32).reshape(16, 16)
+        result[:] = 0
+
+        for i in range(16):
+            unif[i] = data.addresses()[i, i]
+        unif[16] = result.addresses().item(0)
+
+        drv.execute(code, unif.addresses()[0])
+
+        expected = np.zeros((vec, 16), dtype=np.uint32)
+        for i in range(4):
+            expected.reshape(vec, 4, 4)[:, i, :] = np.vectorize(np.roll, signature="(n),()->(n)")(
+                data.reshape(4, 4, 4, 4)[i, :, i, :], -np.arange(4)
+            )[:, :vec].T
+
+        # print()
+        # print(data)
+        # print(result)
+        # print(expected)
+
+        assert (result == expected).all()
+
+
+def test_tmu_vec3_naive_read() -> None:
+    # result[:] <- 0 (result.addresses()[0, 0] must be aligned to 64 bytes)
+    #
+    # data =
+    # [[  1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16]
+    #  [ 17  18  19  20  21  22  23  24  25  26  27  28  29  30  31  32]
+    #  [ 33  34  35  36  37  38  39  40  41  42  43  44  45  46  47  48]
+    #  [ 49  50  51  52  53  54  55  56  57  58  59  60  61  62  63  64]
+    #  [ 65  66  67  68  69  70  71  72  73  74  75  76  77  78  79  80]
+    #  [ 81  82  83  84  85  86  87  88  89  90  91  92  93  94  95  96]
+    #  [ 97  98  99 100 101 102 103 104 105 106 107 108 109 110 111 112]
+    #  [113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128]
+    #  [129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144]
+    #  [145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160]
+    #  [161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176]
+    #  [177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192]
+    #  [193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208]
+    #  [209 210 211 212 213 214 215 216 217 218 219 220 221 222 223 224]
+    #  [225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 240]
+    #  [241 242 243 244 245 246 247 248 249 250 251 252 253 254 255 256]]
+    #
+    # tmuc <- vec3 read
+    # tmua <- data.addresses()[i, i]
+    #
+    # result[i] <- tmu[i]
+    #
+    # result =
+    # [[  1  18  35  52  69  86 103 120 137 154 171 188 205 222 239 256]
+    #  [  2  19  36  49  70  87 104 117 138 155 172 185 206 223 240 253]
+    #  [  3  20  33  50  71  88 101 118 139 156 169 186 207 224 237 254]]
+    #
+    vec = 3
+    with Driver() as drv:
+        code = drv.program(qpu_tmu_vec_n_naive_read, vec)
+        data: Array[np.uint32] = drv.alloc((16, 16), dtype=np.uint32)
+        result: Array[np.uint32] = drv.alloc((vec, 16), dtype=np.uint32)
+        unif: Array[np.uint32] = drv.alloc(16 + 1, dtype=np.uint32)
+
+        assert result.addresses().item(0) % 64 == 0
+
+        data[:] = np.arange(1, 16 * 16 + 1, dtype=np.uint32).reshape(16, 16)
+        result[:] = 0
+
+        for i in range(16):
+            unif[i] = data.addresses()[i, i]
+        unif[16] = result.addresses().item(0)
+
+        drv.execute(code, unif.addresses()[0])
+
+        expected = np.zeros((vec, 16), dtype=np.uint32)
+        for i in range(4):
+            expected.reshape(vec, 4, 4)[:, i, :] = np.vectorize(np.roll, signature="(n),()->(n)")(
+                data.reshape(4, 4, 4, 4)[i, :, i, :], -np.arange(4)
+            )[:, :vec].T
+
+        # print()
+        # print(data)
+        # print(result)
+        # print(expected)
+
+        assert (result == expected).all()
+
+
+def test_tmu_vec2_naive_read() -> None:
+    # result[:] <- 0 (result.addresses()[0, 0] must be aligned to 64 bytes)
+    #
+    # data =
+    # [[  1   2   3   4   5   6   7   8   9  10  11  12  13  14  15  16]
+    #  [ 17  18  19  20  21  22  23  24  25  26  27  28  29  30  31  32]
+    #  [ 33  34  35  36  37  38  39  40  41  42  43  44  45  46  47  48]
+    #  [ 49  50  51  52  53  54  55  56  57  58  59  60  61  62  63  64]
+    #  [ 65  66  67  68  69  70  71  72  73  74  75  76  77  78  79  80]
+    #  [ 81  82  83  84  85  86  87  88  89  90  91  92  93  94  95  96]
+    #  [ 97  98  99 100 101 102 103 104 105 106 107 108 109 110 111 112]
+    #  [113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128]
+    #  [129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144]
+    #  [145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160]
+    #  [161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176]
+    #  [177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192]
+    #  [193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208]
+    #  [209 210 211 212 213 214 215 216 217 218 219 220 221 222 223 224]
+    #  [225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 240]
+    #  [241 242 243 244 245 246 247 248 249 250 251 252 253 254 255 256]]
+    #
+    # tmuc <- vec3 read
+    # tmua <- data.addresses()[i, i]
+    #
+    # result[i] <- tmu[i]
+    #
+    # result =
+    # [[  1  18  35  52  69  86 103 120 137 154 171 188 205 222 239 256]
+    #  [  2  19  36  49  70  87 104 117 138 155 172 185 206 223 240 253]]
+    #
+    vec = 2
+    with Driver() as drv:
+        code = drv.program(qpu_tmu_vec_n_naive_read, vec)
+        data: Array[np.uint32] = drv.alloc((16, 16), dtype=np.uint32)
+        result: Array[np.uint32] = drv.alloc((vec, 16), dtype=np.uint32)
+        unif: Array[np.uint32] = drv.alloc(16 + 1, dtype=np.uint32)
+
+        assert result.addresses().item(0) % 64 == 0
+
+        data[:] = np.arange(1, 16 * 16 + 1, dtype=np.uint32).reshape(16, 16)
+        result[:] = 0
+
+        for i in range(16):
+            unif[i] = data.addresses()[i, i]
+        unif[16] = result.addresses().item(0)
+
+        drv.execute(code, unif.addresses()[0])
+
+        expected = np.zeros((vec, 16), dtype=np.uint32)
+        for i in range(4):
+            expected.reshape(vec, 4, 4)[:, i, :] = np.vectorize(np.roll, signature="(n),()->(n)")(
+                data.reshape(4, 4, 4, 4)[i, :, i, :], -np.arange(4)
+            )[:, :vec].T
+
+        # print()
+        # print(data)
+        # print(result)
+        # print(expected)
+
+        assert (result == expected).all()
