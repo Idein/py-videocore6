@@ -1,6 +1,7 @@
 from typing import Final
 
 from _videocore6.assembler import ALU as ALU
+from _videocore6.assembler import AssembleError as AssembleError
 from _videocore6.assembler import Assembly as Assembly
 from _videocore6.assembler import Branch as Branch
 from _videocore6.assembler import Label as Label
