@@ -1,6 +1,7 @@
 from typing import Final
 
 from _videocore6.assembler import ALU as ALU
+from _videocore6.assembler import AssembleError as AssembleError
 from _videocore6.assembler import Assembly as Assembly
 from _videocore6.assembler import Branch as Branch
 from _videocore6.assembler import Label as Label
@@ -15,6 +16,8 @@ from _videocore6.assembler import Signal as Signal
 from _videocore6.assembler import SignalArg as SignalArg
 from _videocore6.assembler import WriteSignal as WriteSignal
 from _videocore6.assembler import qpu as qpu
+from _videocore6.assembler import assemble as assemble
+from _videocore6.assembler import get_label_positions as get_label_positions
 
 # Structured programming helpers
 loop: Final[LoopHelper]
