@@ -434,3 +434,6 @@ def quad_rotate(
 def rotate(
     dst: Register, src1: Register | int | float, src2: Register | int, cond: str | None = None, sig: SignalArg = None
 ) -> ALU: ...
+
+# Extra instructions
+def raw(packed_code: int) -> None: ...
