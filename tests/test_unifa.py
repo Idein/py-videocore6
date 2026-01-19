@@ -147,7 +147,7 @@ def test_unifa() -> None:
         unif[2] = src1.addresses()[0]
         unif[3] = dst.addresses()[0, 0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         for i in range(n):
             assert all(dst[i, :] == src0[i])

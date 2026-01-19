@@ -95,7 +95,7 @@ def boilerplate_sfu_regs(
         unif[0] = x.addresses()[0]
         unif[1] = y.addresses()[0, 0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         for ix, reg in enumerate(sfu_regs):
             msg = f"mov({reg}, None)"
@@ -156,7 +156,7 @@ def boilerplate_sfu_ops(
         unif[0] = x.addresses()[0]
         unif[1] = y.addresses()[0, 0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         for ix, op in enumerate(sfu_ops):
             msg = f"{op}(None, None)"

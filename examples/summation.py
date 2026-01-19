@@ -172,7 +172,7 @@ def summation(*, length: int, num_qpus: int = 8, unroll_shift: int = 2) -> None:
         print("Executing on QPU...")
 
         start = monotonic()
-        drv.execute(code, unif.addresses()[0], thread=num_qpus)
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0], thread=num_qpus)
         end = monotonic()
 
         assert int(sum(y.astype(int))) % 2**32 == (length - 1) * length // 2 % 2**32

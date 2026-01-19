@@ -75,7 +75,7 @@ def test_branch_rel_imm() -> None:
         unif[0] = x.addresses()[0]
         unif[1] = y.addresses()[0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         assert (y == x + 2).all()
 
@@ -136,7 +136,7 @@ def test_branch_abs_imm() -> None:
         unif[0] = x.addresses()[0]
         unif[1] = y.addresses()[0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         assert (y == x + 2).all()
 
@@ -194,7 +194,7 @@ def test_branch_rel_label() -> None:
         unif[0] = x.addresses()[0]
         unif[1] = y.addresses()[0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         assert (y == x + 3).all()
 
@@ -251,7 +251,7 @@ def test_branch_abs_reg() -> None:
         unif[0] = x.addresses()[0]
         unif[1] = y.addresses()[0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         assert (y == 1).all()
 
@@ -335,7 +335,7 @@ def test_branch_link_reg() -> None:
                 unif[0] = x.addresses()[0]
                 unif[1] = y.addresses()[0, 0]
 
-                drv.execute(code, unif.addresses()[0])
+                drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
                 assert (y[0] == x).all()
                 assert (y[1] == expected).all()
@@ -381,7 +381,7 @@ def test_uniform_branch_rel() -> None:
         unif[3] = 6
         unif[4] = 7  # uniform branch point here
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         assert (y == 7).all()
 
@@ -426,7 +426,7 @@ def test_uniform_branch_abs() -> None:
         unif[3] = 6  # uniform branch point here
         unif[4] = 7
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         assert (y == 6).all()
 
@@ -482,6 +482,6 @@ def test_uniform_branch_reg() -> None:
         unif[4] = 5  # uniform branch point here
         unif[5] = 6
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         assert (y == 5).all()

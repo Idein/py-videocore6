@@ -145,14 +145,14 @@ def test_parallel_16() -> None:
         unif[:, 3] = ys.addresses()[:, 0]
 
         start = time.time()
-        drv.execute(serial_code, unif.addresses()[0, 0])
+        drv.execute(serial_code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0, 0])
         end = time.time()
         serial_cost = end - start
 
         unif[:, 3] = yp.addresses()[:, 0]
 
         start = time.time()
-        drv.execute(parallel_code, unif.addresses()[0, 0], thread=thread)
+        drv.execute(parallel_code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0, 0], thread=thread)
         end = time.time()
         parallel_cost = end - start
 
@@ -271,6 +271,6 @@ def test_barrier() -> None:
         unif[:, 2] = x.addresses()[:, 0]
         unif[:, 3] = y.addresses()[:, 0]
 
-        drv.execute(code, unif.addresses()[0, 0], thread=thread)
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0, 0], thread=thread)
 
         assert (y == np.concatenate([x[1:], x[:1]])).all()
