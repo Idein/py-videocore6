@@ -130,7 +130,12 @@ def test_tmu_load_1_slot_1_qpu() -> None:
                         done[:] = 0
 
                         start = time.time()
-                        csd.dispatch(code, unif.addresses()[0], thread=8)
+                        csd.dispatch(
+                            code,
+                            local_invocation=(16, 1, 1),
+                            uniforms=unif.addresses()[0],
+                            thread=8,
+                        )
                         bench.wait_address(done)
                         end = time.time()
 
@@ -270,7 +275,12 @@ def test_tmu_load_2_slot_1_qpu() -> None:
                         done[:] = 0
 
                         start = time.time()
-                        csd.dispatch(code, unif.addresses()[0], thread=8)
+                        csd.dispatch(
+                            code,
+                            local_invocation=(16, 1, 1),
+                            uniforms=unif.addresses()[0],
+                            thread=8,
+                        )
                         bench.wait_address(done)
                         end = time.time()
 

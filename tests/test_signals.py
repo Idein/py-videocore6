@@ -72,7 +72,7 @@ def test_signal_ldtmu() -> None:
         unif[0] = x.addresses()[0]
         unif[1] = y.addresses()[0, 0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         assert (y[0] == x).all()
         assert (y[1] == 2).all()
@@ -133,7 +133,7 @@ def test_full_rotate() -> None:
         unif[0] = x.addresses()[0]
         unif[1] = y.addresses()[0, 0, 0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         expected = np.concatenate([x, x]) * 2
         for ix, rot in enumerate(range(-15, 16)):
@@ -208,7 +208,7 @@ def test_rotate_alias() -> None:
         unif[0] = x.addresses()[0]
         unif[1] = y.addresses()[0, 0, 0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         expected = np.concatenate([x, x])
         for ix, rot in enumerate(range(-15, 16)):
@@ -269,7 +269,7 @@ def test_quad_rotate() -> None:
         unif[0] = x.addresses()[0]
         unif[1] = y.addresses()[0, 0, 0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         expected = np.concatenate([x.reshape(4, 4)] * 2, axis=1) * 2
         for ix, rot in enumerate(range(-15, 16)):
@@ -344,7 +344,7 @@ def test_quad_rotate_alias() -> None:
         unif[0] = x.addresses()[0]
         unif[1] = y.addresses()[0, 0, 0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         expected = np.concatenate([x.reshape(4, 4)] * 2, axis=1)
         for ix, rot in enumerate(range(-15, 16)):
@@ -397,7 +397,7 @@ def test_full_broadcast() -> None:
         unif[0] = x.addresses()[0]
         unif[1] = y.addresses()[0, 0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         expected = x
         for ix, rot in enumerate(range(-15, 16)):
@@ -450,7 +450,7 @@ def test_broadcast_alias() -> None:
         unif[0] = x.addresses()[0]
         unif[1] = y.addresses()[0, 0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         expected = x
         for ix, rot in enumerate(range(-15, 16)):
@@ -503,7 +503,7 @@ def test_quad_broadcast() -> None:
         unif[0] = x.addresses()[0]
         unif[1] = y.addresses()[0, 0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         expected = np.concatenate([x, x])
         for ix, rot in enumerate(range(-15, 16)):
@@ -556,7 +556,7 @@ def test_quad_broadcast_alias() -> None:
         unif[0] = x.addresses()[0]
         unif[1] = y.addresses()[0, 0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         expected = np.concatenate([x, x])
         for ix, rot in enumerate(range(-15, 16)):

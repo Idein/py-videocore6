@@ -99,6 +99,6 @@ def test_label_with_namespace() -> None:
 
         unif[0] = data.addresses()[0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         assert (data == 5).all()

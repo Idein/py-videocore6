@@ -72,7 +72,7 @@ def test_clock() -> None:
 
         with drv.compute_shader_dispatcher() as csd:
             start = time.time()
-            csd.dispatch(code, unif.addresses()[0])
+            csd.dispatch(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
             bench.wait_address(done)
             end = time.time()
 

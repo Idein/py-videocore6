@@ -68,7 +68,7 @@ def test_multiple_dispatch_delay() -> None:
         ref_start = time.time()
         with drv.compute_shader_dispatcher() as csd:
             for i in range(data.shape[0]):
-                csd.dispatch(code[i], unif.addresses()[i, 0])
+                csd.dispatch(code[i], local_invocation=(16, 1, 1), uniforms=unif.addresses()[i, 0])
         ref_end = time.time()
         assert (data == np.arange(data.shape[0]).reshape(data.shape[0], 1)).all()
 
@@ -79,7 +79,7 @@ def test_multiple_dispatch_delay() -> None:
             for i in range(data.shape[0]):
                 done[:] = 0
                 start = time.time()
-                csd.dispatch(code[i], unif.addresses()[i, 0])
+                csd.dispatch(code[i], local_invocation=(16, 1, 1), uniforms=unif.addresses()[i, 0])
                 bench.wait_address(done)
                 end = time.time()
                 naive_results[i] = end - start
@@ -91,7 +91,7 @@ def test_multiple_dispatch_delay() -> None:
                 done[:] = 0
                 time.sleep(1)
                 start = time.time()
-                csd.dispatch(code[i], unif.addresses()[i, 0])
+                csd.dispatch(code[i], local_invocation=(16, 1, 1), uniforms=unif.addresses()[i, 0])
                 bench.wait_address(done)
                 end = time.time()
                 sleep_results[i] = end - start

@@ -70,7 +70,7 @@ def test_tmu_write() -> None:
         unif[0] = n
         unif[1] = data.addresses()[0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         assert all(data == range(n * 16))
 
@@ -165,7 +165,7 @@ def test_tmu_vec_write() -> None:
         conf &= 0xFFFFFFFF
         unif[2:] = conf
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         for i, row in enumerate(data.reshape(-1, 4 * 16)):
             config = configs[i % len(configs)]
@@ -222,7 +222,7 @@ def test_tmu_read() -> None:
         unif[1] = data.addresses()[0]
         unif[2] = data.addresses()[0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         assert all(data == range(1, n * 16 + 1))
 
@@ -322,7 +322,7 @@ def test_tmu_vec_read() -> None:
         conf &= 0xFFFFFFFF
         unif[3:] = conf
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         for i, vec in enumerate(dst):
             data = src.shape[1] * i + np.arange(src.shape[1], dtype=np.uint32).reshape(len(configs), 16, 4)
@@ -378,7 +378,7 @@ def test_tmu_keeps_memory_consistency() -> None:
         data[:] = 1
         unif[0] = data.addresses()[0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         assert (data[0] == 3).all()
         assert (data[1:] == 1).all()
@@ -433,7 +433,7 @@ def test_tmu_read_tmu_write_uniform_read() -> None:
         unif[0] = data.addresses()[0]
         unif[1] = result.addresses()[0]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         assert (data == 2).all()
         assert (result == 2).all()  # !? not 3 ?
@@ -519,7 +519,7 @@ def test_tmu_vec4_naive_write() -> None:
         for i in range(16):
             unif[i] = result.addresses()[i, i]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         tmud = np.arange(1, 16 * vec + 1, dtype=np.uint32).reshape(vec, 16)
         expected = np.zeros((16, 16), dtype=np.uint32)
@@ -577,7 +577,7 @@ def test_tmu_vec3_naive_write() -> None:
         for i in range(16):
             unif[i] = result.addresses()[i, i]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         tmud = np.arange(1, 16 * vec + 1, dtype=np.uint32).reshape(vec, 16)
         expected = np.zeros((16, 16), dtype=np.uint32)
@@ -634,7 +634,7 @@ def test_tmu_vec2_naive_write() -> None:
         for i in range(16):
             unif[i] = result.addresses()[i, i]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         tmud = np.arange(1, 16 * vec + 1, dtype=np.uint32).reshape(vec, 16)
         expected = np.zeros((16, 16), dtype=np.uint32)
@@ -737,7 +737,7 @@ def test_tmu_vec4_naive_read() -> None:
             unif[i] = data.addresses()[i, i]
         unif[16] = result.addresses().item(0)
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         expected = np.zeros((vec, 16), dtype=np.uint32)
         for i in range(4):
@@ -800,7 +800,7 @@ def test_tmu_vec3_naive_read() -> None:
             unif[i] = data.addresses()[i, i]
         unif[16] = result.addresses().item(0)
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         expected = np.zeros((vec, 16), dtype=np.uint32)
         for i in range(4):
@@ -862,7 +862,7 @@ def test_tmu_vec2_naive_read() -> None:
             unif[i] = data.addresses()[i, i]
         unif[16] = result.addresses().item(0)
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         expected = np.zeros((vec, 16), dtype=np.uint32)
         for i in range(4):
@@ -989,7 +989,7 @@ def test_tmu_vec4_contiguous_write() -> None:
             unif[i] = result.addresses()[i, i]
             expected[i, i : i + vec] = tmud[:, i]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         # print()
         # print(result)
@@ -1037,7 +1037,7 @@ def test_tmu_vec3_contiguous_write() -> None:
             unif[i] = result.addresses()[i, i]
             expected[i, i : i + vec] = tmud[:, i]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         # print()
         # print(result)
@@ -1084,7 +1084,7 @@ def test_tmu_vec2_contiguous_write() -> None:
             unif[i] = result.addresses()[i, i]
             expected[i, i : i + vec] = tmud[:, i]
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         # print()
         # print(result)
@@ -1222,7 +1222,7 @@ def test_tmu_vec4_contiguous_read() -> None:
             unif[i] = data.addresses()[i, i]
         unif[16] = result.addresses().item(0)
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         # print()
         # print(data)
@@ -1279,7 +1279,7 @@ def test_tmu_vec3_contiguous_read() -> None:
             unif[i] = data.addresses()[i, i]
         unif[16] = result.addresses().item(0)
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         # print()
         # print(data)
@@ -1335,7 +1335,7 @@ def test_tmu_vec2_contiguous_read() -> None:
             unif[i] = data.addresses()[i, i]
         unif[16] = result.addresses().item(0)
 
-        drv.execute(code, unif.addresses()[0])
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0])
 
         # print()
         # print(data)

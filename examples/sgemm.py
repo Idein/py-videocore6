@@ -271,7 +271,7 @@ def sgemm_rnn_naive() -> None:
         unif[1] = unif_params.shape[1]
 
         start = getsec()
-        drv.execute(code, unif.addresses()[0], thread=thread)
+        drv.execute(code, local_invocation=(16, 1, 1), uniforms=unif.addresses()[0], thread=thread)
         time_gpu = getsec() - start
 
         # np.set_printoptions(threshold=10000)
